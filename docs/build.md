@@ -31,9 +31,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependen
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Executable.ps1 -PythonExe "D:\Python312\python.exe"
 ```
 
-也可使用 `-PythonDirectory "D:\Python312"` 提供完整运行时目录。默认从 Python 3.12 安装位置或 Python Launcher 查找，输出在 `dist/F1-Radio-Translator-1.0.3.exe`。`-OutputDirectory` 可修改产物位置。
+也可使用 `-PythonDirectory "D:\Python312"` 提供完整运行时目录。默认从 Python 3.12 安装位置或 Python Launcher 查找，输出在 `dist/F1-Radio-Translator-1.0.2.exe`。`-OutputDirectory` 可修改产物位置。
 
-构建流程：生成多个尺寸的 ICO → 收集源码和 OCR 依赖 → 编译区域选择器与任务栏集成模块 → 收集 Python 运行时 → 压缩本地载荷 → 编译无控制台 EXE。启动器只使用 Windows 提供的 PowerShell / .NET Framework。
+构建流程：生成多个尺寸的 ICO → 收集源码和 OCR 依赖 → 编译区域选择器 → 收集 Python 运行时 → 压缩本地载荷 → 编译无控制台 EXE。启动器只使用 Windows 提供的 PowerShell / .NET Framework。
 
 `dist/`、依赖目录、DLL、EXE、ZIP、日志和本机配置均在 `.gitignore` 中。EXE 不提交进 Git；通过 GitHub Releases 分发。模型权重与第三方许可证需要随二进制保留，不由项目 MIT 许可证覆盖。
 

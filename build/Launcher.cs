@@ -13,13 +13,13 @@ using System.Windows.Forms;
 [assembly: AssemblyTitle("MultiViewer F1 Radio Translator")]
 [assembly: AssemblyDescription("MultiViewer F1 无线电实时翻译")]
 [assembly: AssemblyProduct("MultiViewer F1 Radio Translator")]
-[assembly: AssemblyVersion("1.0.3.0")]
-[assembly: AssemblyFileVersion("1.0.3.0")]
+[assembly: AssemblyVersion("1.0.2.0")]
+[assembly: AssemblyFileVersion("1.0.2.0")]
 
 internal static class Launcher
 {
     private static readonly string[] RequiredFiles = {
-        "Start-MultiViewerTranslator.ps1", "RegionSelector.dll", "DesktopIntegration.dll", "rapidocr_worker.py",
+        "Start-MultiViewerTranslator.ps1", "RegionSelector.dll", "rapidocr_worker.py",
         "python-runtime\\python.exe", "python-runtime\\python312.dll",
         "python-runtime\\Lib\\encodings\\__init__.py", "python-deps\\rapidocr\\__init__.py"
     };
@@ -27,7 +27,6 @@ internal static class Launcher
     [STAThread]
     private static void Main()
     {
-        F1RadioTranslator.DesktopIntegration.SetProcessIdentity();
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         try
@@ -133,7 +132,6 @@ internal static class Launcher
         info.EnvironmentVariables["PYTHONPATH"] = Path.Combine(appRoot, "python-deps");
         info.EnvironmentVariables["PYTHONNOUSERSITE"] = "1";
         info.EnvironmentVariables["PYTHONUTF8"] = "1";
-        info.EnvironmentVariables["F1_RADIO_LAUNCHER_PATH"] = Assembly.GetExecutingAssembly().Location;
         using (ApplicationProcessJob job = new ApplicationProcessJob())
         using (Process app = Process.Start(info))
         {
