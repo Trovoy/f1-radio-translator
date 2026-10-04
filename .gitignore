@@ -1,0 +1,33 @@
+# Generated dependencies and packaging output
+/src/python-deps/
+/src/python-runtime/
+/dist/
+*.exe
+*.dll
+*.zip
+*.pdb
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Local configuration and credentials
+.env
+.env.*
+settings*.json
+auth.json
+credentials*.json
+*.key
+*.pem
+*.pfx
+*.p12
+
+# Local captures, logs, and editor state
+captures/
+screenshots-private/
+tmp/
+*.log
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

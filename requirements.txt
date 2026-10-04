@@ -1,0 +1,5 @@
+# Direct OCR dependencies, matching the application implementation.
+rapidocr==3.9.2
+onnxruntime==1.30.0
+numpy>=1.26,<3
+opencv-python>=4.10,<6

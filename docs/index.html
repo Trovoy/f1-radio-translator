@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="为 MultiViewer 观赛场景打造的 Windows 无线电翻译小窗。本地 OCR、英文与中文对照、可配置翻译服务，MIT 开源。">
+  <title>F1 Radio Translator · 读懂车队无线电</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1017;--panel:#141e2a;--line:#263446;--ink:#edf4fc;--muted:#9eaec1;--cyan:#32d5ed;--red:#ff4b4b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif;line-height:1.7}a{color:inherit;text-decoration:none}a:focus-visible{outline:2px solid var(--cyan);outline-offset:6px}header,main,footer{max-width:1160px;margin:auto;padding:0 32px}header{display:flex;align-items:center;justify-content:space-between;padding-top:24px;padding-bottom:24px;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:12px;font-weight:700;letter-spacing:.04em}.brand img{width:44px;height:44px;border-radius:12px}nav{display:flex;gap:24px;color:var(--muted);font-size:14px}.hero{display:grid;grid-template-columns:1.12fr 1fr;gap:52px;align-items:center;padding:90px 0 76px}.eyebrow{font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase}.eyebrow:before{content:"";display:inline-block;background:var(--red);width:24px;height:3px;margin-right:10px;vertical-align:middle;transform:skewX(-28deg)}h1{font-size:clamp(36px,4.5vw,58px);line-height:1.18;letter-spacing:-.04em;margin:20px 0 24px}h1 span{color:var(--cyan)}p{color:var(--muted);margin:0 0 22px}.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}.button{display:inline-block;border:1px solid var(--line);border-radius:12px;padding:12px 20px;font-weight:600;font-size:14px;background:var(--panel)}.button.primary{background:var(--cyan);color:#06121c;border-color:var(--cyan)}.meta{margin-top:20px;font-size:12px;color:var(--muted)}.demo{background:linear-gradient(145deg,#1b2a39,#101721);border:1px solid #34485e;border-radius:22px;box-shadow:0 24px 80px #0007;overflow:hidden;transform:rotate(-1.3deg)}.demo-head{padding:15px 22px;border-bottom:1px solid var(--line);font-size:12px;display:flex;justify-content:space-between;color:var(--muted)}.live{color:var(--cyan)}.radio{padding:24px 26px;border-bottom:1px solid var(--line)}.radio:last-child{border:0}.speaker{font-size:11px;letter-spacing:.14em;color:var(--cyan);margin-bottom:10px}.en{font-size:13px;color:#a5b9cd;margin-bottom:7px}.zh{font-size:20px;font-weight:600;line-height:1.5}.caption{font-size:11px;text-align:right;color:var(--muted);margin-top:18px}.strip{border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:28px;padding:22px 0;font-size:13px;font-weight:600;letter-spacing:.05em}.strip span:before{content:"＋";color:var(--cyan);margin-right:8px}.section{padding:76px 0 0}.section h2{font-size:30px;line-height:1.35;margin:12px 0 20px}.intro{max-width:680px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:28px}.card{padding:28px;border-radius:18px;border:1px solid var(--line);background:var(--panel)}.num{color:var(--cyan);font-size:12px;letter-spacing:.14em;font-weight:700}.card h3{font-size:19px;margin:13px 0 12px}.card p{font-size:14px;margin:0}.workflow{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:28px}.step{border-top:2px solid var(--line);padding-top:20px}.step h3{font-size:18px;margin:12px 0}.step p{font-size:14px}.privacy{display:grid;grid-template-columns:1fr 1fr;gap:36px;border:1px solid var(--line);border-radius:22px;padding:36px;background:linear-gradient(120deg,#152a33,#141b28);margin-top:70px}.privacy h2{margin:10px 0 16px;font-size:28px}.privacy p{font-size:14px}.flow{display:flex;flex-direction:column;justify-content:center;gap:12px}.flow div{padding:14px 18px;border:1px solid #354858;border-radius:12px;font-size:14px}.flow small{display:block;color:var(--muted)}.flow b{color:var(--cyan);padding:0 18px}.closing{padding:70px 0;text-align:center}.closing h2{font-size:32px;margin:0 0 14px}.closing .actions{justify-content:center}.limits{max-width:850px;margin:24px auto 0;font-size:12px}footer{border-top:1px solid var(--line);padding-top:24px;padding-bottom:32px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:20px}.footer-links{display:flex;gap:18px}
+    @media(max-width:850px){.hero{grid-template-columns:1fr;padding:55px 0;gap:38px}.demo{transform:none}.grid{grid-template-columns:1fr}.workflow{grid-template-columns:1fr;gap:12px}.privacy{grid-template-columns:1fr;padding:26px}header,main,footer{padding-left:22px;padding-right:22px}nav{gap:14px}.section{padding-top:52px}footer{flex-direction:column}.strip{gap:14px 24px}.brand{font-size:13px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header>
+    <a class="brand" href="https://github.com/Trovoy/f1-radio-translator"><img src="../src/Translator-logo.png" alt="赛车与无线电图标">F1 RADIO TRANSLATOR</a>
+    <nav aria-label="页面导航"><a href="#features">功能</a><a href="#start">上手</a><a href="https://github.com/Trovoy/f1-radio-translator">GitHub ↗</a></nav>
+  </header>
+  <main>
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Windows · Local OCR · Team Radio</div>
+        <h1>跟上赛道节奏，<br><span>读懂车队无线电。</span></h1>
+        <p>为 MultiViewer 观赛打造的独立翻译小窗。框选英文转录，在本机识别新句子，将原文与中文放在一起，让车手反馈、车队指令与策略沟通更容易理解。</p>
+        <div class="actions"><a class="button primary" href="https://github.com/Trovoy/f1-radio-translator">查看开源项目 ↗</a><a class="button" href="build.md">运行与构建</a></div>
+        <div class="meta">64 位 Windows 10/11 · MIT 许可证 · 自备翻译接口</div>
+      </div>
+      <div>
+        <div class="demo" aria-label="双语译文排版示意">
+          <div class="demo-head"><span>F1 实时译文</span><span class="live">● BILINGUAL</span></div>
+          <div class="radio"><div class="speaker">TEAM RADIO</div><div class="en">Box this lap. Box, box.</div><div class="zh">这一圈进站。进站，进站。</div></div>
+          <div class="radio"><div class="speaker">TEAM RADIO</div><div class="en">Use boost if you need it.</div><div class="zh">需要的话就用 Boost 能量部署。</div></div>
+          <div class="radio"><div class="speaker">TEAM RADIO</div><div class="en">Double yellows, turn two.</div><div class="zh">2 号弯双黄旗。</div></div>
+        </div>
+        <div class="caption">示意文案与排版，非实际比赛内容或翻译准确率承诺</div>
+      </div>
+    </section>
+    <div class="strip"><span>本地 OCR</span><span>英中双语</span><span>说话人标签</span><span>托盘控制</span><span>源码开放</span></div>
+    <section class="section" id="features">
+      <div class="eyebrow">Built for race day</div><h2>把注意力留给比赛。</h2>
+      <p class="intro">从选区到译文，让常用操作触手可及。你决定看哪里、用什么服务，以及窗口如何显示。</p>
+      <div class="grid">
+        <article class="card"><div class="num">01 / CAPTURE</div><h3>选中的区域，看得见</h3><p>八个拖拽手柄、坐标与尺寸标签，支持移动、调整和键盘微调。缩略图每 10 秒刷新，点击可放大查看；选区自动保存，也能随时清除。</p></article>
+        <article class="card"><div class="num">02 / READ</div><h3>译文醒目，原文保留</h3><p>中文与英文逐条对照，识别到的姓名作为本地标签显示。手动切换简洁模式，让观赛小窗只留下阅读内容。</p></article>
+        <article class="card"><div class="num">03 / TRANSLATE</div><h3>选择自己的翻译服务</h3><p>支持 MyMemory、DeepL 和 OpenAI 兼容接口。为支持的接口提供 F1 语境；GPT 选项使用 gpt-6-luna，上游须支持对应模型或别名。</p></article>
+        <article class="card"><div class="num">04 / CONTROL</div><h3>暂停、结束，各有按钮</h3><p>暂停后继续，结束后重新开始。托盘菜单可恢复窗口、控制翻译和退出；点窗口 X 会退出应用并清理工作进程。</p></article>
+        <article class="card"><div class="num">05 / REMEMBER</div><h3>下次观赛，少做重复配置</h3><p>本机记住选区、服务与地址。密钥可选择用 Windows 当前用户加密保存，并提供显示/隐藏开关，方便检查输入。</p></article>
+        <article class="card"><div class="num">06 / DESKTOP</div><h3>为 Windows 小窗设计</h3><p>原生 WPF 深色界面、细滚动条与手动简洁模式。常驻 OCR、画面检测、去重和请求队列减少重复处理，保留最近 120 条结果。</p></article>
+      </div>
+    </section>
+    <section class="section" id="start">
+      <div class="eyebrow">Lights out in three steps</div><h2>三步，开始读无线电。</h2>
+      <div class="workflow">
+        <article class="step"><div class="num">01</div><h3>打开转录窗口</h3><p>在 MultiViewer 中打开 AI Radio Transcriptions，确保英文字幕清晰可见。</p></article>
+        <article class="step"><div class="num">02</div><h3>框选并确认预览</h3><p>将卡片正文和姓名行一起框入，通过缩略图或放大预览检查范围。</p></article>
+        <article class="step"><div class="num">03</div><h3>配置服务，开始翻译</h3><p>填写服务所需的密钥和上游地址，点击开始；英文原文与中文译文随后更新。</p></article>
+      </div>
+    </section>
+    <section class="privacy">
+      <div><div class="eyebrow">Your machine, your settings</div><h2>截图留在本机。<br>工作方式可以查看。</h2><p>屏幕截图与 OCR 在本机完成。应用发送给所选翻译服务的是识别后的字幕正文；说话人标签不附加到翻译请求。密钥和选区不随开源源码发布。</p><a class="button" href="privacy.md">阅读隐私说明 ↗</a></div>
+      <div class="flow" aria-label="数据处理流程"><div>选定屏幕区域<small>本机截图</small></div><b>↓</b><div>本地 OCR<small>提取字幕正文与姓名标签</small></div><b>↓ 仅字幕正文</b><div>你选择的翻译服务<small>译文返回后与英文一同显示</small></div></div>
+    </section>
+    <section class="closing"><h2>为下一场比赛准备好。</h2><p>查看源码，按说明运行或构建自己的 Windows EXE。</p><div class="actions"><a class="button primary" href="https://github.com/Trovoy/f1-radio-translator">前往 GitHub ↗</a><a class="button" href="product-page.md">产品介绍文案</a></div><p class="limits">本工具识别屏幕转录，不直接识别音频。OCR、原始转录与机器翻译均可能有误差；更新延迟受识别、网络及接口影响。翻译服务费用与额度由所选服务决定。本项目与 F1、MultiViewer 及翻译服务商无官方关联。</p></section>
+  </main>
+  <footer><span>F1 Radio Translator · MIT Open Source</span><div class="footer-links"><a href="https://github.com/Trovoy/f1-radio-translator/issues">反馈问题</a><a href="privacy.md">隐私</a><a href="../LICENSE">许可证</a></div></footer>
+</body>
+</html>
