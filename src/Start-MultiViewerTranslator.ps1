@@ -19,6 +19,12 @@ $script:OpenAIKey = ''
 $script:OpenAIBaseUrl = 'https://api.openai.com/v1'
 $script:AppScriptPath = $PSCommandPath
 $script:AppDirectory = Split-Path -Parent $PSCommandPath
+if (-not $TranslateOnce) {
+  $desktopIntegration=Join-Path $script:AppDirectory 'DesktopIntegration.dll'
+  if (Test-Path -LiteralPath $desktopIntegration) { Add-Type -Path $desktopIntegration }
+  else { Add-Type -Path (Join-Path $script:AppDirectory 'DesktopIntegration.cs') }
+  [F1RadioTranslator.DesktopIntegration]::SetProcessIdentity()
+}
 $script:Scanning = $false
 $script:FocusMode = $false
 $script:TranslationProcess = $null
@@ -1127,6 +1133,12 @@ $xaml = @'
 $script:Window=[Windows.Markup.XamlReader]::Load([Xml.XmlNodeReader]::new([xml]$xaml))
 $applicationIcon=Join-Path $script:AppDirectory 'Translator.ico'
 if (Test-Path -LiteralPath $applicationIcon) { $script:Window.Icon=[Windows.Media.Imaging.BitmapFrame]::Create([Uri]::new($applicationIcon)) }
+$script:Window.Add_SourceInitialized({
+  try {
+    $windowHandle=[Windows.Interop.WindowInteropHelper]::new($script:Window).Handle
+    [F1RadioTranslator.DesktopIntegration]::ApplyWindow($windowHandle,$env:F1_RADIO_LAUNCHER_PATH,(Join-Path $script:AppDirectory 'Translator.ico'),$script:AppScriptPath)
+  } catch { Status ('任务栏图标初始化失败：'+$_.Exception.Message) }
+})
 $applicationLogoPath=Join-Path $script:AppDirectory 'Translator-logo.png'
 if (Test-Path -LiteralPath $applicationLogoPath) {
   $script:Window.FindName('ApplicationLogo').Source=[Windows.Media.Imaging.BitmapImage]::new([Uri]::new($applicationLogoPath))
@@ -1436,6 +1448,7 @@ $script:Window.Add_KeyDown({
 })
 $script:Window.Add_Closing({
   param($sender,$e)
+  try { [F1RadioTranslator.DesktopIntegration]::ClearWindow([Windows.Interop.WindowInteropHelper]::new($script:Window).Handle) } catch { }
   if ($script:ShuttingDown) { return }
   Save-Settings
   Shutdown-ApplicationRuntime

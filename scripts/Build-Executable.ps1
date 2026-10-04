@@ -22,7 +22,7 @@ $OutputDirectory=[IO.Path]::GetFullPath($OutputDirectory)
 $buildDirectory=Join-Path $OutputDirectory '.build'
 [void][IO.Directory]::CreateDirectory($buildDirectory)
 $compiler=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-$executablePath=Join-Path $OutputDirectory 'F1-Radio-Translator-1.0.2.exe'
+$executablePath=Join-Path $OutputDirectory 'F1-Radio-Translator-1.0.3.exe'
 $stageDirectory=Join-Path $buildDirectory ('stage-'+[Guid]::NewGuid().ToString('N'))
 $payloadPath=Join-Path $buildDirectory 'payload.zip'
 $payloadIdPath=Join-Path $buildDirectory 'payload.id'
@@ -83,7 +83,7 @@ try {
 try {
   Write-Output 'Collecting application, OCR models, and Python runtime...'
   [void][IO.Directory]::CreateDirectory($stageDirectory)
-  foreach ($sourceFile in @('Start-MultiViewerTranslator.ps1','Start-MultiViewerTranslator.bat','rapidocr_worker.py','RegionSelector.cs','Translator-logo.png','Translator.ico')) {
+  foreach ($sourceFile in @('Start-MultiViewerTranslator.ps1','Start-MultiViewerTranslator.bat','rapidocr_worker.py','RegionSelector.cs','DesktopIntegration.cs','Translator-logo.png','Translator.ico')) {
     [IO.File]::Copy((Join-Path $applicationDirectory $sourceFile),(Join-Path $stageDirectory $sourceFile),$true)
   }
   Copy-PayloadTree (Join-Path $applicationDirectory 'python-deps') (Join-Path $stageDirectory 'python-deps')
@@ -93,6 +93,8 @@ try {
   Write-Output 'Compiling the screen region selector...'
   & $compiler '/nologo' '/target:library' '/platform:x64' '/optimize+' '/codepage:65001' '/reference:System.Windows.Forms.dll' '/reference:System.Drawing.dll' ('/out:'+(Join-Path $stageDirectory 'RegionSelector.dll')) (Join-Path $applicationDirectory 'RegionSelector.cs')
   if ($LASTEXITCODE -ne 0) { throw 'Screen region selector compilation failed.' }
+  & $compiler '/nologo' '/target:library' '/platform:x64' '/optimize+' '/codepage:65001' ('/out:'+(Join-Path $stageDirectory 'DesktopIntegration.dll')) (Join-Path $applicationDirectory 'DesktopIntegration.cs')
+  if ($LASTEXITCODE -ne 0) { throw 'Desktop integration compilation failed.' }
   $runtimeDestination=Join-Path $stageDirectory 'python-runtime'
   [void][IO.Directory]::CreateDirectory($runtimeDestination)
   foreach ($runtimeFile in Get-ChildItem -LiteralPath $pythonDirectory -File) {
@@ -117,7 +119,8 @@ try {
     ('/resource:'+$payloadPath+',Translator.Payload'),
     ('/resource:'+$payloadIdPath+',Translator.PayloadId'),
     ('/resource:'+$logoPath+',Translator.Logo'),
-    (Join-Path $workspaceRoot 'build\Launcher.cs')
+    (Join-Path $workspaceRoot 'build\Launcher.cs'),
+    (Join-Path $applicationDirectory 'DesktopIntegration.cs')
   )
   & $compiler @compilerArguments
   if ($LASTEXITCODE -ne 0) { throw ('Executable compilation failed: '+$LASTEXITCODE) }
