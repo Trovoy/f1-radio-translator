@@ -42,7 +42,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependen
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Executable.ps1
 ```
 
-输出在 `dist/`。完整 EXE 包含 Python 和 OCR 依赖，首次运行会在本机应用数据目录展开，之后复用缓存。源码仓库不包含预生成 EXE；可分发二进制放在 [GitHub Releases](https://github.com/Trovoy/f1-radio-translator/releases)。详细参数见[构建说明](docs/build.md)。
+输出在 `dist/`。完整 EXE 包含 Python 和 OCR 依赖，首次运行会在本机应用数据目录展开，之后复用缓存。预编译版本见 [GitHub Releases](https://github.com/Trovoy/f1-radio-translator/releases)：可直接下载 EXE，也可下载包含使用说明与许可证的便携 ZIP。详细参数见[构建说明](docs/build.md)。
 
 ## 翻译服务配置
 

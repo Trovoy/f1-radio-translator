@@ -15,7 +15,7 @@ function Resolve-Python312([string]$PythonExe) {
   }
   foreach ($candidate in $candidates) {
     if (-not (Test-Path -LiteralPath $candidate -PathType Leaf)) { continue }
-    $version=& $candidate -I -c 'import sys, struct; print("%d.%d-%d" % (sys.version_info[0], sys.version_info[1], struct.calcsize("P") * 8))' 2>$null
+    $version=& $candidate -I -c 'import sys, struct; print(str(sys.version_info[0])+chr(46)+str(sys.version_info[1])+chr(45)+str(struct.calcsize(chr(80))*8))' 2>$null
     if ($LASTEXITCODE -eq 0 -and ([string]$version).Trim() -eq '3.12-64') { return (Resolve-Path -LiteralPath $candidate).Path }
   }
   throw 'Install 64-bit Python 3.12, or supply -PythonExe with its full executable path.'
