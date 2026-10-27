@@ -1,33 +1,37 @@
-# 隐私与本机数据
+**English** | [简体中文](privacy.zh-CN.md)
 
-## 数据如何流动
+# Privacy and local data
+
+## Data flow
 
 ```text
-用户框选的屏幕区域
-  → 本机截图
-  → 本机 RapidOCR
-  → 字幕正文队列
-  → 用户选择的翻译接口
-  → 本机英中双语窗口
+Selected screen region
+  → local screenshot
+  → local RapidOCR
+  → recognized subtitle body queue
+  → your selected translation endpoint
+  → local English–Chinese window
 ```
 
-- 截图和放大预览只用于本机识别、显示，翻译请求不上传图像。
-- 新字幕的正文发送给所选服务；从姓名行提取出的说话人标签不附加到请求。
-- OCR 分组或识别仍可能出错。框选内容若含私人文字，也可能被识别为正文发往翻译接口。
-- GPT / DeepL 等请求使用用户填写的接口凭证。应用没有自己的共享密钥或代理服务。
+- Screenshots and enlarged previews are used locally; translation requests do not upload images.
+- New subtitle body text goes to the selected provider. Speaker labels extracted from the name line are not appended.
+- OCR grouping/recognition can be wrong. Private text inside the selected region may also be recognized and transmitted as subtitle text.
+- GPT/DeepL requests use your credentials. The app supplies no shared key or author-hosted proxy.
 
-## 设置保存
+## Stored settings
 
-设置文件位于 `%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json`。
+The settings file is `%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json`.
 
-密钥默认只在运行时使用；勾选“记住密钥”后，通过 Windows 当前用户的 DPAPI 加密保存。选区、翻译服务和 Base URL 以普通配置保存；地址不是自动加密字段，应避免在 URL 中写入秘密。取消记住选项可删除对应已保存密钥。
+Keys are runtime-only by default. Enabling “记住密钥” (remember key) stores them encrypted with the current Windows user's DPAPI. Capture bounds, provider and Base URL are ordinary settings; the URL is not automatically encrypted, so do not embed secrets in it. Disabling key remembrance removes the corresponding saved key.
 
-OCR 临时截图位于系统临时目录，正常退出时删除；发生系统崩溃或强制断电时可能残留。EXE 运行依赖缓存与用户设置分开保存，不包括翻译结果数据库。
+Temporary OCR screenshots are stored in the system temporary directory and removed on normal exit; crashes or power loss can leave files behind. The EXE dependency cache is separate from user settings and is not a translation-history database.
 
-## 开源仓库不收集什么
+## Repository contents
 
-仓库仅提交公开源码、图标、构建脚本和文档。没有用户设置、真实密钥、DPAPI 密文、截图、聊天记录、日志、登录凭证或个人开发路径。依赖、运行时和二进制构建产物也不进入 Git。
+The repository contains public source, icons, build scripts and documentation, not user settings, real keys, DPAPI ciphertext, screenshots, chats, logs, login credentials or private development paths. Dependencies, runtimes and generated binaries are excluded from Git.
 
-## 反馈问题时
+## Reporting problems
 
-请遮住 API Key、授权头、账户信息、私人文件路径、包含秘密的上游 URL。不要将 `settings.json`、`.env` 或授权文件提交为 Issue 附件。
+Redact API keys, authorization headers, account details, private paths and secret-bearing provider URLs. Never attach `settings.json`, `.env` or authorization files to an issue.
+
+[Back to README](../README.md)

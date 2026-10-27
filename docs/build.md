@@ -1,48 +1,54 @@
-# 构建说明
+**English** | [简体中文](build.zh-CN.md)
 
-## 环境
+# Build and run
 
-- 64 位 Windows 10/11。
-- Windows PowerShell 5.1 和 Windows 提供的 .NET Framework / WPF。
-- 64 位 Python 3.12 的完整安装目录，内含 `python.exe`、`python312.dll`、`Lib/`、`DLLs/` 和许可证文件。
-- 首次准备 OCR 依赖需要访问 Python 包索引。
+## Requirements
 
-本项目不要求安装 Codex，也没有个人开发目录或账户配置依赖。
+- 64-bit Windows 10/11, Windows PowerShell 5.1 and the Windows-provided .NET Framework/WPF.
+- A **full 64-bit Python 3.12 installation**, including `python.exe`, `python312.dll`, `Lib/`, `DLLs/` and license files.
+- Access to the Python package index for initial OCR dependency installation.
 
-## 准备依赖
+No Codex installation, personal development path or author account configuration is required.
 
-在仓库根目录运行：
+## Prepare dependencies
+
+From the repository root:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependencies.ps1
 ```
 
-指定 Python 安装位置：
+Select a Python installation explicitly if needed:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependencies.ps1 -PythonExe "D:\Python312\python.exe"
 ```
 
-脚本将 OCR 依赖装到 `src/python-deps/`。运行源码时区域选择器会从 C# 源码加载；构建 EXE 时会预编译为 DLL。
+Dependencies are installed in `src/python-deps/`. Source runs load the C# region selector from source; EXE builds precompile it as a DLL.
 
-## 构建单文件 EXE
+## Build a single-file EXE
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Executable.ps1 -PythonExe "D:\Python312\python.exe"
 ```
 
-也可使用 `-PythonDirectory "D:\Python312"` 提供完整运行时目录。默认从 Python 3.12 安装位置或 Python Launcher 查找，输出在 `dist/F1-Radio-Translator-1.0.2.exe`。`-OutputDirectory` 可修改产物位置。
+Alternatively pass `-PythonDirectory "D:\Python312"` for a full runtime directory. By default the script looks for Python 3.12 installations/Python Launcher and writes `dist/F1-Radio-Translator-1.0.2.exe`. Use `-OutputDirectory` to choose another output directory.
 
-构建流程：生成多个尺寸的 ICO → 收集源码和 OCR 依赖 → 编译区域选择器 → 收集 Python 运行时 → 压缩本地载荷 → 编译无控制台 EXE。启动器只使用 Windows 提供的 PowerShell / .NET Framework。
+The build creates multi-size icons, collects source/OCR dependencies, compiles the region selector, gathers Python, compresses the payload and compiles a console-free EXE. The launcher uses Windows-provided PowerShell/.NET Framework.
 
-`dist/`、依赖目录、DLL、EXE、ZIP、日志和本机配置均在 `.gitignore` 中。EXE 不提交进 Git；通过 GitHub Releases 分发。模型权重与第三方许可证需要随二进制保留，不由项目 MIT 许可证覆盖。
+`dist/`, dependency folders, DLL/EXE/ZIP outputs, logs and local settings are ignored by Git. Distribute binaries through Releases rather than committing them. Preserve model and third-party licenses with binaries; the project's MIT license does not replace them.
 
-## 运行时缓存
+## Runtime data
 
-用户设置：`%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json`。
+| Data | Location |
+| --- | --- |
+| User settings | `%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json` |
+| EXE dependency cache | `%LOCALAPPDATA%\MultiViewerRadioTranslator\app\<payload-version>` |
 
-EXE 依赖缓存：`%LOCALAPPDATA%\MultiViewerRadioTranslator\app\版本标识\`。不同载荷使用不同标识，EXE 旁不生成解压文件夹。启动器通过 Windows Job Object 管理所属工作进程，主进程退出时回收子进程。
+Different payloads use different cache identifiers. No extraction directory is created beside the EXE. A Windows Job Object reclaims launcher-owned child processes when the main process exits.
 
-## 当前发布状态
+## Validation before release
 
-源码整理自 1.0.2 实现，包含对 Windows PowerShell 5.1 输入编码属性的兼容性修复。源码整理本身不等于完整运行验证；发布二进制前应在目标 Windows 环境确认 OCR、翻译接口和托盘退出流程。
+The source is based on 1.0.2 and includes the Windows PowerShell 5.1 stdin-encoding compatibility fix. Source cleanup/build success is not a full runtime acceptance test. Verify OCR, each intended translation provider and tray/window exit on the target Windows system before publishing binaries.
+
+[Back to README](../README.md) · [Privacy](privacy.md)

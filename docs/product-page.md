@@ -1,37 +1,39 @@
+**English** | [简体中文](product-page.zh-CN.md)
+
 # F1 Radio Translator
 
-## 跟上赛道节奏，读懂车队无线电
+## Read team radio without losing track of the race
 
-F1 Radio Translator 是一款为 Windows 观赛场景打造的英中双语翻译小窗。它读取 MultiViewer 屏幕上的无线电转录，在本机识别英文字幕，再通过你选择的翻译服务呈现简体中文。你可以继续关注比赛画面，同时在一旁查看车队指令、车手反馈与策略沟通；英文原文也始终保留，方便核对意思。
+An English–Chinese translation window for Windows race viewing. F1 Radio Translator reads MultiViewer's on-screen radio transcripts, recognizes English locally and presents Simplified Chinese using your selected service. Keep the race in view while checking team instructions, driver feedback and strategy; the English source remains alongside the translation.
 
-### 从框选区域开始
+### Start with a capture region
 
-用可移动、可调整的蓝色选框选中转录卡片。八个圆形手柄和坐标尺寸标签让区域更容易确定，缩略图则随时提醒你识别的是哪里。点击缩略图可以放大查看；选区会保存在本机，下次观赛可直接恢复。
+Move and resize a blue frame around the transcript card. Eight handles and coordinate/size labels help identify the region. A thumbnail shows what is being captured; open it to zoom and scroll. The selection is saved locally for the next session.
 
-### 中文更醒目，原文可对照
+### Compare the translation with its source
 
-中文译文放在英文原文下方，字号更大。框入姓名行时，软件会将识别出的说话人标注在内容上方。想让观赛窗口更清爽，可手动切换简洁模式，只保留说话人、英文与中文；需要调整配置时再返回控制面板。
+Larger Chinese text appears below the English original. Include the name line to show detected speakers above the content. Manual compact mode keeps only the speaker and bilingual text visible; return to the controls when settings need adjusting. The app UI is currently Chinese.
 
-### 为赛车无线电补充语境
+### Add F1 context
 
-软件为支持的翻译接口提供 F1 语境，帮助处理旗语、进站、赛道限制、能量部署等术语，并要求保留无法确认的转录片段。你可以选择 MyMemory、DeepL，或配置 OpenAI 兼容上游。当前 GPT 选项使用 `gpt-6-luna` 模型名，上游需支持这个名称或相应别名。
+Supported translation prompts include flags, pit stops, track limits and energy deployment, while preserving unconfirmed transcript fragments. Choose MyMemory, DeepL or an OpenAI-compatible upstream. The current GPT option requests `gpt-6-luna`; the provider must support that model name or an alias.
 
-### 根据自己的习惯使用
+### Control your viewing window
 
-暂停、继续、结束翻译和清空译文都有独立操作。最小化或收起到托盘后，程序可以继续工作；双击托盘图标即可恢复，右键菜单也能控制翻译和退出。点窗口 X 会退出应用并清理其工作进程。
+Pause, resume, stop and clear translations separately. Minimize or send the app to the tray to keep it working in the background. Double-click the tray icon to restore; use its menu for controls and exit. The window's X exits and cleans up workers.
 
-### 本地识别，凭证由你掌握
+### Keep OCR local
 
-截图与 OCR 在本机完成，发送给翻译服务的是识别后的字幕正文。密钥可选择仅用于本次运行，或通过 Windows 当前用户加密保存在本机；你也可以随时切换明文显示，检查输入是否正确。源码使用 MIT 许可证开放，工作方式与构建流程都可以查看。
+Screenshots/OCR run on your computer. Only recognized subtitle body text goes to the translation service. Use a key for the session or optionally remember it with Windows current-user encryption. You can reveal/hide the field to check what was entered. The original source is MIT licensed and its build process is documented.
 
-### 三步开始观赛
+### Three steps to start
 
-1. 打开 MultiViewer 的 AI Radio Transcriptions。
-2. 框选正文和姓名行，确认预览区域。
-3. 配置翻译服务，点击“开始翻译”。
+1. Open MultiViewer AI Radio Transcriptions.
+2. Select the card body and speaker line; verify the preview.
+3. Configure a provider and choose “开始翻译” (start translation).
 
-项目面向 64 位 Windows 10/11。完整 EXE 内置 OCR 运行依赖，源码也可按构建说明运行。翻译服务的密钥、费用、额度和模型权限由所选服务决定。
+Requires 64-bit Windows 10/11. The full EXE bundles the OCR runtime; source runs follow the build guide. Provider credentials, fees, quotas and model access are your responsibility.
 
-OCR、原始转录和机器翻译都可能出现误差；内容通过轮询更新，延迟取决于画面、识别、网络和接口处理。这个独立工具不提供比赛内容、MultiViewer 账号或音频识别，也与 F1、MultiViewer 无官方关联。
+Polling, OCR, the original transcript and machine translation all affect delay/accuracy. This independent tool supplies no race content, MultiViewer account or audio recognition and has no official affiliation with F1 or MultiViewer.
 
-[查看源码](https://github.com/Trovoy/f1-radio-translator) · [构建与运行](build.md) · [隐私说明](privacy.md)
+[Source](https://github.com/Trovoy/f1-radio-translator) · [Build and run](build.md) · [Privacy](privacy.md)

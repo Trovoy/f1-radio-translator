@@ -1,15 +1,17 @@
-# 第三方组件说明
+**English** | [简体中文](THIRD_PARTY_NOTICES.zh-CN.md)
 
-项目原创源码使用 MIT 许可证。第三方组件、运行时和模型仍适用各自许可证，不能以本项目 MIT 许可证覆盖。
+# Third-party notices
 
-源码仓库不提交 Python 运行时、OCR 安装目录或模型权重。构建时通过 `requirements.txt` 安装依赖；打包 EXE 时保留运行时的 `LICENSE.txt` 和各 wheel 的 `.dist-info` / 许可证文件。
+Original project source is MIT licensed. Third-party components, runtimes and models retain their own terms; the project's MIT license does not replace them.
 
-| 组件 | 用途 | 许可或说明 |
+Python runtimes, installed OCR dependencies and model weights are not committed. The build installs dependencies from `requirements.txt`; packaged EXEs retain runtime `LICENSE.txt` files and wheel `.dist-info`/license files.
+
+| Component | Use | Terms / handling |
 | --- | --- | --- |
-| [Python](https://docs.python.org/3/license.html) | OCR 运行时 | PSF 及其包含的第三方许可；构建时保留运行时 LICENSE.txt |
-| [RapidOCR](https://pypi.org/project/rapidocr/) | OCR 管线 | Apache-2.0；实际模型及数据文件按上游随包声明处理 |
-| [ONNX Runtime](https://pypi.org/project/onnxruntime/) | 模型推理 | MIT；随包第三方通知需要保留 |
-| OpenCV、NumPy、Pillow、Shapely 等 | 图像处理与依赖 | 保留各安装包的许可及元数据 |
-| Windows PowerShell / WPF / .NET Framework | Windows 窗口与进程管理 | 使用 Windows 环境提供的组件；本仓库不重新许可这些组件 |
+| [Python](https://docs.python.org/3/license.html) | OCR runtime | PSF and included third-party terms; retain runtime LICENSE.txt. |
+| [RapidOCR](https://pypi.org/project/rapidocr/) | OCR pipeline | Apache-2.0; follow upstream notices for actual model/data files. |
+| [ONNX Runtime](https://pypi.org/project/onnxruntime/) | Model inference | MIT; retain bundled third-party notices. |
+| OpenCV, NumPy, Pillow, Shapely and dependencies | Image processing | Retain each installed package's license and metadata. |
+| Windows PowerShell / WPF / .NET Framework | Windows UI/processes | Supplied by Windows; not relicensed by this repository. |
 
-项目赛车图标为本项目生成的图形资产，不使用官方 F1 或 MultiViewer 标识。F1、Formula 1、MultiViewer 等名称属于其各自权利人；本项目是独立工具，与其无官方关联。
+The racing icon was generated for this project and does not use the official F1 or MultiViewer marks. F1, Formula 1, MultiViewer and other names belong to their respective holders. This independent tool is not officially affiliated with them.

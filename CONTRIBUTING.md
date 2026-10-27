@@ -1,11 +1,13 @@
-# 参与开发
+**English** | [简体中文](CONTRIBUTING.zh-CN.md)
 
-感谢关注 F1 Radio Translator。欢迎改进 OCR、F1 术语翻译、Windows 界面和构建流程。
+# Contributing
 
-1. 按 [README](README.md) 准备 Python 3.12 与本地依赖。
-2. 基于自己的分支修改，描述问题、改动和验证结果。
-3. 通过 Pull Request 提交；涉及交互变化时，可附不含个人信息的截图。
+Improvements to OCR, F1 terminology, the Windows interface and builds are welcome.
 
-请勿提交 API Key、OAuth 凭证、账户配置、私人路径、真实比赛截图或本机日志。依赖、模型、运行环境和 EXE 使用构建流程准备，不提交进 Git。新增依赖时同步更新许可证说明。
+1. Follow the [README](README.md) and [build guide](docs/build.md) to prepare Python 3.12 and local dependencies.
+2. Make changes on a branch. Explain the problem, resulting behavior and validation performed.
+3. Open a pull request; include redacted screenshots for interface changes when useful.
 
-请区分原始转录错误、OCR 错误和翻译错误。报告问题时提供操作步骤、Windows/Python 版本及已脱敏的示例文字即可。不要为了重现问题贴出密钥或带凭证的 URL。
+Do not commit API keys, OAuth credentials, account settings, private paths, real race screenshots or local logs. Prepare dependencies/models/runtimes/EXEs with the build workflow instead of checking them into Git. Update third-party notices for new dependencies.
+
+Distinguish original transcript errors, OCR mistakes and translation errors. Reports should include reproduction steps, Windows/Python versions and redacted sample text, without keys or credential-bearing URLs. Do not claim a full race-session validation when only syntax/build checks were performed.
