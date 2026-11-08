@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>框选识别区域</title>
+  <link rel="stylesheet" href="/src/selector.css">
+</head>
+<body>
+  <div class="bar" id="bar">
+    <span class="t">拖动框选 MultiViewer 的无线电转录卡片，记得把下方姓名行一起框进去</span>
+    <span class="k"><kbd>Enter</kbd> 确认 · <kbd>Esc</kbd> 取消 · 方向键微调</span>
+    <button id="cancel">取消</button>
+    <button id="ok" class="pri" disabled>确认区域</button>
+  </div>
+  <div class="sel" id="sel" hidden>
+    <span class="size" id="size"></span>
+    <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i>
+    <i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i>
+  </div>
+  <script type="module" src="/src/selector.js"></script>
+</body>
+</html>

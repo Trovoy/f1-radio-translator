@@ -1,0 +1,29 @@
+@import "./tokens.css";
+
+html, body { margin: 0; height: 100%; overflow: hidden; user-select: none; }
+body { font-family: var(--sans); color: var(--ink); cursor: crosshair; background: rgba(0, 0, 0, .42); }
+body.has-sel { background: transparent; }
+
+.sel { position: fixed; border-radius: 4px; box-shadow: 0 0 0 1.5px var(--ink), 0 0 0 9999px rgba(0, 0, 0, .42); cursor: move; }
+.sel .size { position: absolute; left: 0; top: -30px; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-variant-numeric: tabular-nums;
+  background: rgba(20, 20, 22, .92); box-shadow: inset 0 0 0 1px var(--line-2); white-space: nowrap; }
+.sel i { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px rgba(0, 0, 0, .5); }
+.sel i[data-h="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
+.sel i[data-h="n"] { left: calc(50% - 5px); top: -5px; cursor: ns-resize; }
+.sel i[data-h="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
+.sel i[data-h="e"] { right: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+.sel i[data-h="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.sel i[data-h="s"] { left: calc(50% - 5px); bottom: -5px; cursor: ns-resize; }
+.sel i[data-h="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.sel i[data-h="w"] { left: -5px; top: calc(50% - 5px); cursor: ew-resize; }
+
+.bar { position: fixed; left: 0; right: 0; top: 18px; margin: 0 auto; width: max-content; max-width: calc(100% - 32px); z-index: 2; cursor: default;
+  display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 16px; border-radius: 12px; font-size: 13px;
+  background: rgba(22, 22, 25, .94); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 16px 40px -12px rgba(0, 0, 0, .8);
+  animation: drop .45s var(--spring) both; }
+@keyframes drop { from { opacity: 0; transform: translateY(-10px); } }
+.bar .k { color: var(--ink-3); font-size: 12px; }
+kbd { font-family: ui-monospace, Consolas, monospace; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, .08); color: var(--ink-2); }
+.bar button { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; font-size: 13px; background: var(--fill-2); color: var(--ink); }
+.bar button.pri { background: var(--ink); color: #141416; }
+.bar button:disabled { opacity: .4; cursor: default; }

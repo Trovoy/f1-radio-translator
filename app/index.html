@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>F1 Radio</title>
+  <link rel="stylesheet" href="/src/main.css">
+</head>
+<body>
+  <div class="win" id="win">
+    <aside class="side" data-tauri-drag-region>
+      <div class="app" data-tauri-drag-region><span class="app-mk" id="appMark"></span><span class="wordmark">F1 Radio</span></div>
+      <nav class="nav" id="nav">
+        <span class="ind" id="ind"></span>
+        <button aria-current="true" data-p="home"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3 6a7 7 0 0 1 10 0M5.2 8.4a4 4 0 0 1 5.6 0"/><circle cx="8" cy="11.5" r="1" fill="currentColor"/></svg>概览</button>
+        <button aria-current="false" data-p="svc"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h6"/></svg>翻译服务</button>
+        <button aria-current="false" data-p="style"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.75" y="3" width="12.5" height="10" rx="2"/><path d="M4.5 10h7"/></svg>字幕样式</button>
+        <button aria-current="false" data-p="region"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 5.5v-3h3M10.5 2.5h3v3M13.5 10.5v3h-3M5.5 13.5h-3v-3"/></svg>识别区域</button>
+        <button aria-current="false" data-p="keys"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.75" y="4" width="12.5" height="8" rx="1.5"/><path d="M4.5 7h1M7.5 7h1M10.5 7h1M5 9.5h6"/></svg>快捷键</button>
+      </nav>
+      <div class="sp" data-tauri-drag-region></div>
+      <div class="mini-st"><i class="dot" id="sideDot"></i><span id="sideSt">未开始</span><b id="sideTime">00:00</b></div>
+      <div class="ver">版本 2.0</div>
+    </aside>
+
+    <div class="content">
+      <div class="titlebar" data-tauri-drag-region>
+        <button id="wMin" aria-label="最小化"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M2 6h8"/></svg></button>
+        <button id="wClose" class="x" aria-label="退出"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.2"><path d="M2.5 2.5l7 7M9.5 2.5l-7 7"/></svg></button>
+      </div>
+
+      <!-- HOME -->
+      <section class="page" id="p-home">
+        <div class="hero">
+          <div>
+            <div class="k">状态</div>
+            <div class="title"><span class="t" id="hTitle">准备就绪</span></div>
+            <div class="sub" id="hSub"></div>
+          </div>
+          <div class="ctl">
+            <button class="round off" id="hStop" aria-label="结束"></button>
+            <button class="go" id="hGo"><span class="ic" id="hIc"></span><span class="lb" id="hLb">开始翻译</span></button>
+          </div>
+        </div>
+        <div class="msg" id="hMsg" hidden></div>
+        <canvas class="wave" id="wave" width="1200" height="112" aria-hidden="true"></canvas>
+        <div class="stats">
+          <div><b id="nCnt">0</b><span>已翻译</span></div>
+          <div><b id="nLat">0.00<small>秒</small></b><span>平均耗时</span></div>
+          <div><b id="nQ">0</b><span>排队</span></div>
+        </div>
+        <div class="gl">字幕窗</div>
+        <div class="group">
+          <div class="row"><span>显示字幕窗<small>Ctrl Alt H</small></span><button class="tg" role="switch" aria-checked="true" id="ovShow" aria-label="显示字幕窗"></button></div>
+          <div class="row"><span>锁定，鼠标穿透到视频<small>Ctrl Alt L</small></span><button class="tg" role="switch" aria-checked="false" id="ovLock" aria-label="锁定字幕窗"></button></div>
+        </div>
+        <div class="gl">最近</div>
+        <div class="group"><ul class="recent" id="recent"><li class="none">开始后，最近三句会出现在这里。</li></ul></div>
+      </section>
+
+      <!-- SERVICES -->
+      <section class="page" id="p-svc" hidden>
+        <div class="ph"><span class="k">24 家可选</span><h3>翻译服务</h3><p>按顺序使用，前一个失败或被限流时自动换下一个。</p></div>
+        <div class="chain" id="chain"></div>
+        <div class="group">
+          <div class="row"><span>失败时自动切换<small>关闭后只用第一个</small></span><button class="tg" role="switch" id="tFallback" aria-label="失败时自动切换"></button></div>
+          <div class="row"><span>大模型带上下文<small>附上同一说话人的前 2 句</small></span><button class="tg" role="switch" id="tContext" aria-label="带上下文"></button></div>
+        </div>
+        <div style="margin-top:22px"><div class="seg" id="catSeg"><button aria-pressed="true" data-c="mt">机器翻译</button><button aria-pressed="false" data-c="llm">大模型</button><button aria-pressed="false" data-c="local">本地与自建</button></div></div>
+        <div class="group plist" id="plist"></div>
+      </section>
+
+      <!-- STYLE -->
+      <section class="page" id="p-style" hidden>
+        <div class="ph"><span class="k">实时预览</span><h3>字幕样式</h3><p>改动会立即作用到字幕窗。</p></div>
+        <div class="pvw" id="pvw"><div class="s"><div class="o">现在需要松油滑行，目标是负 3。</div><div class="z">计划是什么？这个赛段我还能跑更久。</div><div class="e">What's the plan? I can go longer on this stint.</div></div></div>
+        <div class="group">
+          <div class="row"><span>字号</span><input type="range" id="szR" min="18" max="56" value="34" aria-label="字号"></div>
+          <div class="row"><span>字体</span><div class="seg" id="fontSeg"><button aria-pressed="true" data-v="sans">黑体</button><button aria-pressed="false" data-v="serif">宋体</button></div></div>
+          <div class="row"><span>对齐</span><div class="seg" id="alignSeg"><button aria-pressed="true" data-v="center">居中</button><button aria-pressed="false" data-v="left">左对齐</button></div></div>
+          <div class="row"><span>行数<small>上一句缩小留在上方</small></span><div class="seg" id="lineSeg"><button aria-pressed="false" data-v="1">1 行</button><button aria-pressed="true" data-v="2">2 行</button></div></div>
+        </div>
+        <div class="group">
+          <div class="row"><span>底板不透明度</span><input type="range" id="plR" min="0" max="80" value="0" aria-label="底板不透明度"></div>
+          <div class="row"><span>英文原文</span><button class="tg" role="switch" aria-checked="true" id="enT" aria-label="英文原文"></button></div>
+        </div>
+        <div class="acts" style="margin-top:18px"><button class="btn" id="demo">在字幕窗里预览</button></div>
+      </section>
+
+      <!-- REGION -->
+      <section class="page" id="p-region" hidden>
+        <div class="ph"><span class="k">MultiViewer 无线电转录</span><h3>识别区域</h3><p>框住卡片正文和下方的姓名行，软件会从姓名行识别说话人。</p></div>
+        <div class="shot" id="shot"><canvas id="shotCv"></canvas><span class="scan"></span><span class="empty" id="shotEmpty">尚未框选</span></div>
+        <div class="group">
+          <div class="row"><span>区域</span><span class="v" id="regionText">—</span></div>
+          <div class="row"><span>识别频率</span><div class="seg" id="freqSeg"><button aria-pressed="false" data-v="800">0.8 秒</button><button aria-pressed="true" data-v="1200">1.2 秒</button><button aria-pressed="false" data-v="2000">2 秒</button></div></div>
+          <div class="row"><span>画面不变时跳过<small>减少重复识别</small></span><button class="tg" role="switch" id="tSkip" aria-label="画面不变时跳过"></button></div>
+          <div class="row"><span>识别引擎</span><span class="v" id="ocrText">Windows 文字识别</span></div>
+        </div>
+        <div class="acts" style="margin-top:18px"><button class="btn pri" id="reselect">重新框选</button><button class="btn" id="refresh">刷新预览</button></div>
+      </section>
+
+      <!-- KEYS -->
+      <section class="page" id="p-keys" hidden>
+        <div class="ph"><span class="k">全局生效</span><h3>快捷键</h3><p>全屏看比赛时也能用。</p></div>
+        <div class="group">
+          <div class="row"><span>开始 / 暂停</span><kbd>Ctrl Alt F9</kbd></div>
+          <div class="row"><span>结束</span><kbd>Ctrl Alt F10</kbd></div>
+          <div class="row"><span>锁定 / 解锁字幕窗</span><kbd>Ctrl Alt L</kbd></div>
+          <div class="row"><span>显示 / 隐藏字幕窗</span><kbd>Ctrl Alt H</kbd></div>
+          <div class="row"><span>打开主窗口</span><kbd>Ctrl Alt ,</kbd></div>
+        </div>
+      </section>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

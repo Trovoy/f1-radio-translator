@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "F1 Radio",
+  "version": "2.0.0",
+  "identifier": "com.trovoy.f1radio",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "F1 Radio",
+        "url": "index.html",
+        "width": 960,
+        "height": 620,
+        "minWidth": 820,
+        "minHeight": 540,
+        "center": true,
+        "decorations": false,
+        "shadow": true,
+        "backgroundColor": "#18181b"
+      },
+      {
+        "label": "overlay",
+        "title": "F1 Radio 字幕",
+        "url": "overlay.html",
+        "width": 980,
+        "height": 260,
+        "minWidth": 360,
+        "minHeight": 160,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    }
+  }
+}

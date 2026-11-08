@@ -1,0 +1,47 @@
+/* Shared design language: dark glass, warm white ink, one red "on air" accent.
+   System fonts (Segoe UI + Microsoft YaHei UI) render crisply on Windows. */
+@import "@fontsource/michroma/400.css";
+
+:root {
+  --ink: #f4f2ee;
+  --ink-2: rgba(244, 242, 238, .62);
+  --ink-3: rgba(244, 242, 238, .36);
+  --line: rgba(255, 255, 255, .08);
+  --line-2: rgba(255, 255, 255, .14);
+  --fill: rgba(255, 255, 255, .045);
+  --fill-2: rgba(255, 255, 255, .08);
+  --red: #ff4d3d;
+  --ok: #5fd39a;
+  --warn: #f0b45a;
+  --sans: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+  --display: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  --serif: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --wordmark: "Michroma", "Bahnschrift", var(--sans);
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --spring: cubic-bezier(.34, 1.4, .64, 1);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 1.5px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+
+.mk path { fill: none; stroke: currentColor; stroke-width: 2.3; stroke-linecap: round; stroke-linejoin: round; }
+.mk path.r { stroke: var(--red); }
+.mk path.d { stroke-width: 4.6; }
+.mk.draw path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: mk-draw 1s var(--ease) forwards; animation-delay: calc(var(--k) * .16s); }
+@keyframes mk-draw { to { stroke-dashoffset: 0; } }
+
+.wordmark { font-family: var(--wordmark); font-weight: 400; letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
+
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink-3); flex: none; transition: background .3s; }
+.dot.live { background: var(--red); box-shadow: 0 0 8px var(--red); animation: pulse 2s ease-in-out infinite; }
+.dot.paused { background: var(--warn); }
+@keyframes pulse { 50% { opacity: .4; } }
+
+@keyframes resolve { from { opacity: 0; filter: blur(8px); transform: translateY(4px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
