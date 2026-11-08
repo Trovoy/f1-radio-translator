@@ -12,9 +12,13 @@ const byId = new Map();
 
 // ── hover: the toolbar shows while the pointer is anywhere over the window ──
 let hoverTimer;
-document.addEventListener("pointerenter", () => { clearTimeout(hoverTimer); document.body.classList.add("hover"); });
-document.addEventListener("pointermove", () => { clearTimeout(hoverTimer); document.body.classList.add("hover"); });
-document.addEventListener("pointerleave", () => { hoverTimer = setTimeout(() => document.body.classList.remove("hover"), 380); });
+const hoverOn = () => { clearTimeout(hoverTimer); document.body.classList.add("hover"); };
+const hoverOff = () => { clearTimeout(hoverTimer); hoverTimer = setTimeout(() => document.body.classList.remove("hover"), 380); };
+document.documentElement.addEventListener("mouseenter", hoverOn);
+document.addEventListener("pointermove", hoverOn);
+// `pointerleave` never fires on `document`; the root element's mouseleave does when the pointer exits the window.
+document.documentElement.addEventListener("mouseleave", hoverOff);
+window.addEventListener("blur", hoverOff);
 
 $("#grip").addEventListener("mousedown", (e) => { if (e.button === 0) win.startDragging(); });
 $("#rs").addEventListener("mousedown", (e) => { if (e.button === 0) win.startResizeDragging("SouthEast"); });
