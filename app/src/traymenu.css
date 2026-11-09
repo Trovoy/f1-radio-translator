@@ -1,7 +1,7 @@
 @import "./tokens.css";
 
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
-body { font-family: var(--sans); color: var(--ink); font-size: 13px; padding: 6px; }
+body { font-family: var(--sans); color: var(--ink); font-size: var(--fs-md); padding: 6px; }
 
 .menu { border-radius: 12px; padding: 6px; background: rgba(28, 28, 31, .97);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1), 0 12px 32px -10px rgba(0, 0, 0, .8); }
@@ -11,7 +11,7 @@ body { font-family: var(--sans); color: var(--ink); font-size: 13px; padding: 6p
 .head { display: flex; align-items: center; gap: 9px; padding: 6px 8px 10px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
 .head .mk svg { display: block; width: 18px; height: 18px; color: var(--ink); }
 .head .wordmark { font-size: 9.5px; color: rgba(244, 242, 238, .9); }
-.head .st { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-3); }
+.head .st { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: var(--fs-sm); color: var(--ink-3); }
 
 button { width: 100%; height: 32px; border: 0; background: none; border-radius: 7px; display: flex; align-items: center; gap: 10px;
   padding: 0 9px; color: var(--ink-2); text-align: left; transition: background .15s, color .15s; }
@@ -20,5 +20,5 @@ button:disabled { opacity: .35; pointer-events: none; }
 button svg { width: 14px; height: 14px; flex: none; }
 button span { flex: 1; }
 button.quit:hover { background: rgba(229, 55, 42, .18); color: #ffb4ab; }
-kbd { font-family: ui-monospace, Consolas, monospace; font-size: 10.5px; color: var(--ink-3); }
+kbd { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-xs); color: var(--ink-3); }
 .sep { height: 1px; background: var(--line); margin: 4px 6px; }

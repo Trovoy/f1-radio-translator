@@ -26,7 +26,7 @@ body.has-sel { background: transparent; }
   animation: tools-in .2s var(--ease) both; }
 @keyframes tools-in { from { opacity: 0; transform: translateY(-3px); } }
 .tools button { height: 30px; min-width: 30px; padding: 0 9px; border: 0; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;
-  font-size: 12.5px; background: none; color: var(--ink-2); transition: background .15s, color .15s; }
+  font-size: var(--fs-md); background: none; color: var(--ink-2); transition: background .15s, color .15s; }
 .tools button:hover { background: var(--fill-2); color: var(--ink); }
 .tools button.pri { background: var(--ink); color: #141416; font-weight: 600; }
 .tools button.pri:hover { background: #fff; }

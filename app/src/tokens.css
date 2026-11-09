@@ -17,6 +17,16 @@
   --display: "Segoe UI Variable Display", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
   --serif: "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
   --wordmark: "Michroma", "Bahnschrift", var(--sans);
+  /* Type scale: every size in the app comes from here. */
+  --fs-xs: 11px;   /* version, kbd */
+  --fs-sm: 12px;   /* captions, labels, hints */
+  --fs-md: 13px;   /* buttons, inputs, secondary text */
+  --fs-base: 14px; /* navigation, row labels, body */
+  --fs-xl: 24px;   /* page titles */
+  --fs-2xl: 28px;  /* status title, big numbers */
+  /* Spacing: multiples of 4. */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+  --r-sm: 6px; --r-md: 8px; --r-lg: 10px;
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.34, 1.4, .64, 1);
   color-scheme: dark;
