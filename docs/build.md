@@ -4,51 +4,75 @@
 
 ## Requirements
 
-- 64-bit Windows 10/11, Windows PowerShell 5.1 and the Windows-provided .NET Framework/WPF.
-- A **full 64-bit Python 3.12 installation**, including `python.exe`, `python312.dll`, `Lib/`, `DLLs/` and license files.
-- Access to the Python package index for initial OCR dependency installation.
+- 64-bit Windows 10/11 with WebView2 (built into current Windows).
+- [Node.js](https://nodejs.org/) 20 or newer.
+- [Rust](https://rustup.rs/) (stable, MSVC toolchain) and the Visual Studio C++ build tools.
 
-No Codex installation, personal development path or author account configuration is required.
+No Python, personal development path or author account is needed.
 
-## Prepare dependencies
-
-From the repository root:
+## Develop
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependencies.ps1
+npm install
+npx tauri dev
 ```
 
-Select a Python installation explicitly if needed:
+Debug builds read a few environment variables; release builds ignore them:
+
+| Variable | Effect |
+| --- | --- |
+| `F1RADIO_DEMO=1` | The subtitle window plays sample lines, handy for styling |
+| `F1RADIO_AUTOSTART=1` | Starts translating three seconds after launch |
+| `F1RADIO_SETTINGS=<path>` | Uses another settings file, so tests never touch your real settings |
+| `F1RADIO_DRYRUN=1` | Prints where each window would open, then exits without showing any |
+
+## Package
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependencies.ps1 -PythonExe "D:\Python312\python.exe"
+npx tauri build
 ```
 
-Dependencies are installed in `src/python-deps/`. Source runs load the C# region selector from source; EXE builds precompile it as a DLL.
+The NSIS installer is written to `src-tauri/target/release/bundle/nsis/`. The llama.cpp engine and local models are not bundled; the app downloads them on demand.
 
-## Build a single-file EXE
+## Test
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Executable.ps1 -PythonExe "D:\Python312\python.exe"
+cd src-tauri
+cargo test --lib
 ```
 
-Alternatively pass `-PythonDirectory "D:\Python312"` for a full runtime directory. By default the script looks for Python 3.12 installations/Python Launcher and writes `dist/F1-Radio-Translator-1.0.2.exe`. Use `-OutputDirectory` to choose another output directory.
+The default tests run offline: OCR on the sample cards in `tests/`, card splitting, speaker snapping, name protection, slang rewriting and prompt building. Ignored tests need extra resources:
 
-The build creates multi-size icons, collects source/OCR dependencies, compiles the region selector, gathers Python, compresses the payload and compiles a console-free EXE. The launcher uses Windows-provided PowerShell/.NET Framework.
+| Test | Needs |
+| --- | --- |
+| `mymemory_translates`, `mymemory_keeps_driver_names` | Network |
+| `deepl_samples_from_user_settings` | Network and a DeepL key in your own settings |
+| `ocr_dump_file` | `F1RADIO_OCR_FILE` pointing to a raw capture |
+| `local_model_end_to_end` | Downloads the engine and a model (gigabytes) and uses the GPU; pick the model with `F1RADIO_LOCAL_MODEL` |
 
-`dist/`, dependency folders, DLL/EXE/ZIP outputs, logs and local settings are ignored by Git. Distribute binaries through Releases rather than committing them. Preserve model and third-party licenses with binaries; the project's MIT license does not replace them.
+Run one with `cargo test --lib <name> -- --ignored --nocapture`.
 
-## Runtime data
+## Layout
+
+| Path | Purpose |
+| --- | --- |
+| `index.html`, `src/main.js` | Main window: overview, translation services, local models, subtitle style, capture region, hotkeys |
+| `overlay.html`, `src/overlay.js` | Transparent subtitle window with hover toolbar and click-through lock |
+| `selector.html`, `src/selector.js` | Region selection, one window per monitor |
+| `traymenu.html`, `src/traymenu.js` | Tray menu |
+| `src/providers.js` | Field definitions for the translation services |
+| `src-tauri/src/vision.rs` | GDI capture, Windows OCR, MultiViewer card parsing, driver grid |
+| `src-tauri/src/translate.rs` | Translation adapters, F1 glossary, prompts |
+| `src-tauri/src/local.rs` | llama.cpp engine and model downloads, server lifecycle, speed stats |
+| `src-tauri/src/engine.rs` | Capture loop, concurrent translation, fallback chain |
+| `src-tauri/src/settings.rs` | Settings file; secrets encrypted with Windows DPAPI |
+| `src-tauri/src/lib.rs` | Windows, tray, hotkeys and commands |
+
+## Local data
 
 | Data | Location |
 | --- | --- |
-| User settings | `%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json` |
-| EXE dependency cache | `%LOCALAPPDATA%\MultiViewerRadioTranslator\app\<payload-version>` |
+| Settings | `%APPDATA%\com.trovoy.f1radio\settings.json` |
+| Engine and models | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
 
-Different payloads use different cache identifiers. No extraction directory is created beside the EXE. A Windows Job Object reclaims launcher-owned child processes when the main process exits.
-
-## Validation before release
-
-The source is based on 1.0.2 and includes the Windows PowerShell 5.1 stdin-encoding compatibility fix. Source cleanup/build success is not a full runtime acceptance test. Verify OCR, each intended translation provider and tray/window exit on the target Windows system before publishing binaries.
-
-[Back to README](../README.md) · [Privacy](privacy.md)
+[Back to README](../README.md)

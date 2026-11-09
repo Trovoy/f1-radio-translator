@@ -6,32 +6,39 @@
 
 ```text
 Selected screen region
-  → local screenshot
-  → local RapidOCR
-  → recognized subtitle body queue
-  → your selected translation endpoint
-  → local English–Chinese window
+  → screenshot in memory
+  → Windows OCR (local)
+  → new transcript lines
+  → your chosen translation service, or the local model on your GPU
+  → subtitle window
 ```
 
-- Screenshots and enlarged previews are used locally; translation requests do not upload images.
-- New subtitle body text goes to the selected provider. Speaker labels extracted from the name line are not appended.
-- OCR grouping/recognition can be wrong. Private text inside the selected region may also be recognized and transmitted as subtitle text.
-- GPT/DeepL requests use your credentials. The app supplies no shared key or author-hosted proxy.
+- Screenshots are kept in memory only and are never uploaded or written to disk.
+- Cloud services receive the recognized line. DeepL and language models also receive a few earlier lines from the same driver as context, and language models receive the speaker's name.
+- With the built-in local model, translation runs entirely on your computer and no transcript text leaves it.
+- OCR can be wrong. Anything private inside the selected region may be recognized and sent as transcript text.
+- Requests use your own credentials. The app has no shared key, author-hosted proxy or telemetry.
 
-## Stored settings
+## Network access
 
-The settings file is `%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json`.
+Besides the translation service you configure, the app only connects to GitHub (the llama.cpp engine), ModelScope and Hugging Face (model files), and only when you download a local model.
 
-Keys are runtime-only by default. Enabling “记住密钥” (remember key) stores them encrypted with the current Windows user's DPAPI. Capture bounds, provider and Base URL are ordinary settings; the URL is not automatically encrypted, so do not embed secrets in it. Disabling key remembrance removes the corresponding saved key.
+## Stored data
 
-Temporary OCR screenshots are stored in the system temporary directory and removed on normal exit; crashes or power loss can leave files behind. The EXE dependency cache is separate from user settings and is not a translation-history database.
+| Data | Location |
+| --- | --- |
+| Settings: region, service order, style, window positions | `%APPDATA%\com.trovoy.f1radio\settings.json` |
+| API keys and secrets | Same file, encrypted with the current Windows user's DPAPI |
+| Local engine, models, engine log | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
+
+Base URLs and model names are stored as plain settings, so do not embed secrets in a URL. Uninstalling the app leaves these folders; delete them to remove all data.
 
 ## Repository contents
 
-The repository contains public source, icons, build scripts and documentation, not user settings, real keys, DPAPI ciphertext, screenshots, chats, logs, login credentials or private development paths. Dependencies, runtimes and generated binaries are excluded from Git.
+The repository contains source, icons, two sample transcript captures for the OCR tests (the driver photo removed) and documentation. It contains no user settings, real keys, DPAPI ciphertext, logs or private paths. Dependencies, models and binaries are excluded from Git.
 
 ## Reporting problems
 
-Redact API keys, authorization headers, account details, private paths and secret-bearing provider URLs. Never attach `settings.json`, `.env` or authorization files to an issue.
+Redact API keys, authorization headers, account details, private paths and secret-bearing URLs. Never attach `settings.json` or `.env` files to an issue.
 
 [Back to README](../README.md)

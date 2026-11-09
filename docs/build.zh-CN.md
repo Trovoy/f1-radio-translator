@@ -1,50 +1,78 @@
 [English](build.md) | **简体中文**
 
-# 构建说明
+# 构建与运行
 
-## 环境
+## 环境要求
 
-- 64 位 Windows 10/11。
-- Windows PowerShell 5.1 和 Windows 提供的 .NET Framework / WPF。
-- 64 位 Python 3.12 的完整安装目录，内含 `python.exe`、`python312.dll`、`Lib/`、`DLLs/` 和许可证文件。
-- 首次准备 OCR 依赖需要访问 Python 包索引。
+- 64 位 Windows 10/11，带 WebView2（新版 Windows 自带）。
+- [Node.js](https://nodejs.org/) 20 或更新版本。
+- [Rust](https://rustup.rs/)（stable，MSVC 工具链）和 Visual Studio C++ 生成工具。
 
-本项目不要求安装 Codex，也没有个人开发目录或账户配置依赖。
+不需要 Python，也不依赖任何个人开发路径或作者账号。
 
-## 准备依赖
-
-在仓库根目录运行：
+## 开发
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependencies.ps1
+npm install
+npx tauri dev
 ```
 
-指定 Python 安装位置：
+调试版支持几个环境变量，正式版会忽略它们：
+
+| 变量 | 作用 |
+| --- | --- |
+| `F1RADIO_DEMO=1` | 字幕窗自动播放几句示例字幕，便于调样式 |
+| `F1RADIO_AUTOSTART=1` | 启动 3 秒后自动开始翻译 |
+| `F1RADIO_SETTINGS=路径` | 改用指定的设置文件，测试时不碰真实设置 |
+| `F1RADIO_DRYRUN=1` | 只打印各窗口会打开的位置，然后退出，不显示任何窗口 |
+
+## 打包
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-Dependencies.ps1 -PythonExe "D:\Python312\python.exe"
+npx tauri build
 ```
 
-脚本将 OCR 依赖装到 `src/python-deps/`。运行源码时区域选择器会从 C# 源码加载；构建 EXE 时会预编译为 DLL。
+NSIS 安装包输出在 `src-tauri/target/release/bundle/nsis/`。llama.cpp 引擎和本地模型不打进安装包，由软件按需下载。
 
-## 构建单文件 EXE
+## 测试
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Executable.ps1 -PythonExe "D:\Python312\python.exe"
+cd src-tauri
+cargo test --lib
 ```
 
-也可使用 `-PythonDirectory "D:\Python312"` 提供完整运行时目录。默认从 Python 3.12 安装位置或 Python Launcher 查找，输出在 `dist/F1-Radio-Translator-1.0.2.exe`。`-OutputDirectory` 可修改产物位置。
+默认测试全部离线：用 `tests/` 里的示例卡片检查文字识别、卡片拆分、车手名对齐、名字保护、口语改写和提示词。被忽略的测试需要额外条件：
 
-构建流程：生成多个尺寸的 ICO → 收集源码和 OCR 依赖 → 编译区域选择器 → 收集 Python 运行时 → 压缩本地载荷 → 编译无控制台 EXE。启动器只使用 Windows 提供的 PowerShell / .NET Framework。
+| 测试 | 需要 |
+| --- | --- |
+| `mymemory_translates`、`mymemory_keeps_driver_names` | 联网 |
+| `deepl_samples_from_user_settings` | 联网，且你自己的设置里有 DeepL 密钥 |
+| `ocr_dump_file` | 用 `F1RADIO_OCR_FILE` 指定一份原始截图 |
+| `local_model_end_to_end` | 会下载引擎和模型（数 GB）并占用显卡；用 `F1RADIO_LOCAL_MODEL` 选模型 |
 
-`dist/`、依赖目录、DLL、EXE、ZIP、日志和本机配置均在 `.gitignore` 中。EXE 不提交进 Git；通过 GitHub Releases 分发。模型权重与第三方许可证需要随二进制保留，不由项目 MIT 许可证覆盖。
+单独运行：`cargo test --lib <测试名> -- --ignored --nocapture`。
 
-## 运行时缓存
+## 目录结构
 
-用户设置：`%LOCALAPPDATA%\MultiViewerRadioTranslator\settings.json`。
+| 位置 | 作用 |
+| --- | --- |
+| `index.html`、`src/main.js` | 主窗口：概览、翻译服务、本地模型、字幕样式、识别区域、快捷键 |
+| `overlay.html`、`src/overlay.js` | 透明字幕窗，悬停显示工具栏，可锁定为鼠标穿透 |
+| `selector.html`、`src/selector.js` | 框选识别区域，每块显示器各开一个 |
+| `traymenu.html`、`src/traymenu.js` | 托盘菜单 |
+| `src/providers.js` | 各翻译服务的字段定义 |
+| `src-tauri/src/vision.rs` | GDI 截屏、Windows OCR、MultiViewer 卡片拆分、车手名单 |
+| `src-tauri/src/translate.rs` | 翻译适配器、F1 术语表、提示词 |
+| `src-tauri/src/local.rs` | llama.cpp 引擎和模型下载、推理服务启停、速度统计 |
+| `src-tauri/src/engine.rs` | 识别循环、并发翻译、失败自动切换 |
+| `src-tauri/src/settings.rs` | 设置读写，密钥用 Windows DPAPI 加密 |
+| `src-tauri/src/lib.rs` | 窗口、托盘、快捷键和命令 |
 
-EXE 依赖缓存：`%LOCALAPPDATA%\MultiViewerRadioTranslator\app\版本标识`。不同载荷使用不同标识，EXE 旁不生成解压文件夹。启动器通过 Windows Job Object 管理所属工作进程，主进程退出时回收子进程。
+## 本机数据
 
-## 当前发布状态
+| 数据 | 位置 |
+| --- | --- |
+| 设置 | `%APPDATA%\com.trovoy.f1radio\settings.json` |
+| 引擎和模型 | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
 
-源码整理自 1.0.2 实现，包含对 Windows PowerShell 5.1 输入编码属性的兼容性修复。源码整理本身不等于完整运行验证；发布二进制前应在目标 Windows 环境确认 OCR、翻译接口和托盘退出流程。
+[返回 README](../README.zh-CN.md)
