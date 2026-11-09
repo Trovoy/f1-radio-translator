@@ -369,6 +369,7 @@ const SMALL_CK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" str
 function progressText(p) {
   if (!p) return "准备下载…";
   if (p.task === "unpack") return p.label;
+  if (p.task === "move") return `正在移动 ${p.total ? Math.floor((p.done / p.total) * 100) : 0}% · ${gb(p.done)} / ${gb(p.total)}`;
   const pct = p.total ? Math.floor((p.done / p.total) * 100) : 0;
   const speed = p.speed > 0 ? ` · ${(p.speed / 1024 ** 2).toFixed(1)} MB/s` : "";
   return `${p.label} ${pct}%${speed}`;
@@ -383,6 +384,7 @@ function localPanelHTML() {
     : `推理引擎 · ${kind} · 首次下载模型时会一并下载（约 ${mb(localInfo.engine_size)}）`;
   const cards = localInfo.models.map((m) => {
     const busy = localInfo.downloading === m.id;
+    const moving = localInfo.downloading === "__move";
     const p = localProg[m.id];
     let act;
     if (busy) {
@@ -390,6 +392,8 @@ function localPanelHTML() {
       act = `<div class="lm-prog"><div class="lm-bar"><i style="width:${pct}%"></i></div><span class="lm-pct">${escapeHtml(progressText(p))}</span><button class="btn ghost" data-lcancel>取消</button></div>`;
     } else if (!m.installed) {
       act = `<button class="btn" data-ldl="${m.id}"${localInfo.downloading ? " disabled" : ""}>下载</button>`;
+    } else if (moving) {
+      act = '<span class="lm-meta">移动中…</span>';
     } else {
       act = (using === m.id ? `<span class="lm-using">${SMALL_CK}正在使用</span>` : `<button class="btn pri" data-luse="${m.id}">使用此模型</button>`)
         + `<button class="btn ghost${confirmDelete === m.id ? " danger" : ""}" data-ldel="${m.id}">${confirmDelete === m.id ? "确认删除" : "删除"}</button>`;
@@ -402,7 +406,33 @@ function localPanelHTML() {
       + (localErr[m.id] ? `<div class="lm-err">${escapeHtml(localErr[m.id])}</div>` : "")
       + `</div>`;
   }).join("");
-  return `<div class="lm-engine">${engine}</div>${perfHTML(using)}<div class="lm-list">${cards}</div>`;
+  return `${dirHTML()}<div class="lm-engine">${engine}</div>${perfHTML(using)}<div class="lm-list">${cards}</div>`;
+}
+
+// ── where the engine and models live ──
+let dirErr = "";
+function dirHTML() {
+  const moving = localInfo.downloading === "__move";
+  const p = localProg.__move;
+  const free = localInfo.dir_free != null ? ` · 剩余 ${gb(localInfo.dir_free)}` : "";
+  const act = moving
+    ? `<div class="lm-prog"><div class="lm-bar"><i style="width:${p?.total ? (p.done / p.total) * 100 : 0}%"></i></div><span class="lm-pct">${escapeHtml(p ? progressText(p) : "正在移动…")}</span></div>`
+    : `<button class="btn ghost" data-ldir${localInfo.downloading ? " disabled" : ""}>更改</button>`
+      + (localInfo.dir_is_default ? "" : `<button class="btn ghost" data-ldirreset${localInfo.downloading ? " disabled" : ""}>恢复默认</button>`);
+  return `<div class="lm-dir"><div class="lm-dir-t"><span class="lm-dir-l">存放位置</span>`
+    + `<span class="lm-dir-p" title="${escapeHtml(localInfo.dir)}">${escapeHtml(localInfo.dir)}</span><span class="lm-dir-f">${free}</span></div>`
+    + `<div class="lm-act">${act}</div></div>`
+    + (dirErr ? `<div class="lm-err">${escapeHtml(dirErr)}</div>` : "");
+}
+
+async function relocate(dir) {
+  dirErr = "";
+  delete localProg.__move;
+  localInfo.downloading = "__move";
+  renderLocalPanel();
+  try { await invoke("local_relocate", { dir }); }
+  catch (err) { dirErr = `没有移动成功：${err}`; }
+  loadLocal();
 }
 
 // ── live speed of the loaded model ──
@@ -471,7 +501,7 @@ async function loadLocal() {
 
 listen("local-progress", ({ payload }) => {
   localProg[payload.model] = payload;
-  const card = document.querySelector(`.lm[data-m="${payload.model}"]`);
+  const card = payload.model === "__move" ? document.querySelector(".lm-dir") : document.querySelector(`.lm[data-m="${payload.model}"]`);
   const bar = card?.querySelector(".lm-bar i"), txt = card?.querySelector(".lm-pct");
   if (bar && txt) {
     bar.style.width = `${payload.total ? (payload.done / payload.total) * 100 : 0}%`;
@@ -485,6 +515,12 @@ listen("local-changed", loadLocal);
 $("#plist").addEventListener("click", async (e) => {
   const t = e.target.closest("button");
   if (!t) return;
+  if (t.hasAttribute("data-ldir")) {
+    const dir = await invoke("local_pick_dir");
+    if (dir) relocate(dir);
+    return;
+  }
+  if (t.hasAttribute("data-ldirreset")) { relocate(null); return; }
   if (t.dataset.ldl) {
     const id = t.dataset.ldl;
     delete localErr[id];

@@ -29,13 +29,14 @@ fn get_settings(shared: S) -> Settings {
 #[tauri::command]
 fn save_settings(app: AppHandle, shared: S, settings: Settings) -> Result<(), String> {
     // Window positions are owned by the backend; the page's copy may be stale.
-    let (overlay, main_window) = {
+    let (overlay, main_window, model_dir) = {
         let s = shared.settings.lock().unwrap();
-        (s.overlay, s.main_window)
+        (s.overlay, s.main_window, s.model_dir.clone())
     };
     let mut next = settings;
     next.overlay = overlay;
     next.main_window = main_window;
+    next.model_dir = model_dir;
     *shared.settings.lock().unwrap() = next.clone();
     shared.save()?;
     let _ = app.emit("settings-changed", next);
@@ -110,6 +111,9 @@ struct LocalModelView {
 
 #[derive(Serialize)]
 struct LocalInfo {
+    dir: String,
+    dir_is_default: bool,
+    dir_free: Option<u64>,
     engine_kind: &'static str,
     engine_installed: bool,
     engine_size: u64,
@@ -121,7 +125,11 @@ struct LocalInfo {
 #[tauri::command]
 async fn local_info() -> LocalInfo {
     let l = local::get();
+    let root = l.root();
     LocalInfo {
+        dir: root.to_string_lossy().into_owned(),
+        dir_is_default: root == l.default_root(),
+        dir_free: local::free_bytes(&root),
         engine_kind: local::engine_kind(),
         engine_installed: l.engine_installed(),
         engine_size: local::engine_download_size(),
@@ -183,6 +191,41 @@ async fn local_bench(id: String) -> Result<u64, String> {
         translate::translate(&client, "local", &fields, &job).await?;
     }
     Ok(t0.elapsed().as_millis() as u64)
+}
+
+/// Opens a folder picker; returns the chosen folder, or nothing if cancelled.
+#[tauri::command]
+async fn local_pick_dir(app: AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+    let start = local::get().root();
+    let start = if start.exists() { start } else { start.parent().map(|p| p.to_path_buf()).unwrap_or(start) };
+    tauri::async_runtime::spawn_blocking(move || {
+        app.dialog().file().set_title("选择模型存放位置").set_directory(start).blocking_pick_folder()
+    })
+    .await
+    .ok()
+    .flatten()
+    .and_then(|p| p.into_path().ok())
+    .map(|p| p.to_string_lossy().into_owned())
+}
+
+/// Moves the engine and models to `dir` (or back to the default with none) and remembers it.
+#[tauri::command]
+async fn local_relocate(app: AppHandle, shared: S<'_>, dir: Option<String>) -> Result<String, String> {
+    let l = local::get();
+    let target = match dir.as_deref().map(str::trim) {
+        Some(d) if !d.is_empty() => std::path::PathBuf::from(d),
+        _ => l.default_root().to_path_buf(),
+    };
+    let root = l.relocate(target).await?;
+    let snapshot = {
+        let mut s = shared.settings.lock().unwrap();
+        s.model_dir = (root != l.default_root()).then(|| root.to_string_lossy().into_owned());
+        s.clone()
+    };
+    shared.save()?;
+    let _ = app.emit("settings-changed", snapshot);
+    Ok(root.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -570,6 +613,7 @@ fn on_shortcut(app: &AppHandle, shortcut: &Shortcut) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app, None)))
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
@@ -588,7 +632,8 @@ pub fn run() {
             };
             let shared = Arc::new(Shared::new(Settings::load(&path), path));
             app.manage(shared.clone());
-            local::init(app.path().app_local_data_dir()?.join("local"));
+            let chosen = shared.settings.lock().unwrap().model_dir.clone().map(std::path::PathBuf::from);
+            local::init(app.path().app_local_data_dir()?.join("local"), chosen);
             local::attach(app.handle().clone());
             let handle = app.handle().clone();
             // Development aid: `F1RADIO_DRYRUN=1` prints where windows would open and exits before any shows.
@@ -651,6 +696,8 @@ pub fn run() {
             engine_cmd,
             test_provider,
             local_stats,
+            local_pick_dir,
+            local_relocate,
             local_bench,
             capture_preview,
             set_overlay_locked,

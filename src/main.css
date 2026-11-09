@@ -199,6 +199,11 @@ kbd { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-xs); p
 /* ── built-in local models ── */
 #lmWrap { display: flex; flex-direction: column; gap: var(--s3); }
 .lm-engine { font-size: var(--fs-sm); color: var(--ink-3); }
+.lm-dir { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 32px; }
+.lm-dir-t { display: flex; align-items: baseline; gap: var(--s2); min-width: 0; }
+.lm-dir-l { flex: none; font-size: var(--fs-md); color: var(--ink-2); }
+.lm-dir-p { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); color: var(--ink); }
+.lm-dir-f { flex: none; font-size: var(--fs-sm); color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .lm-list { display: flex; flex-direction: column; gap: var(--s2); }
 .lm { border-radius: var(--r-lg); padding: 14px var(--s4); background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .3s var(--ease); }
 .lm.using { box-shadow: inset 0 0 0 1px rgba(95, 211, 154, .45); }

@@ -25,7 +25,7 @@
 
 ## 快速开始
 
-1. 在 [Releases](https://github.com/Trovoy/f1-radio-translator/releases) 下载 `F1-Radio_2.0.0_x64-setup.exe` 并安装。
+1. 在 [Releases](https://github.com/Trovoy/f1-radio-translator/releases) 下载 `F1-Radio_<版本>_x64-setup.exe` 并安装。
 2. 在 MultiViewer 里打开 **AI Radio Transcriptions**。
 3. 在软件里进入 **识别区域**，框住转录卡片。
 4. 在 **翻译服务** 里配置一家服务（MyMemory 不需要密钥）。想离线翻译：进入 **本地与自建 → 本地模型（显卡）**，下载模型，点 **使用此模型**，再点 **设为主用**。
@@ -52,7 +52,7 @@ Windows 文字识别需要英语（美国）语言。如果提示缺少识别语
 | HY-MT1.5 7B | 4.6 GB | 约 6 GB | 腾讯翻译模型，碎片化短句偏直译。 |
 | HY-MT1.5 1.8B | 1.1 GB | 约 2 GB | 很快但质量一般，适合显卡较弱的电脑。 |
 
-推理引擎是 llama.cpp：N 卡用 CUDA 版（约 680 MB），其他显卡用 Vulkan 版（约 38 MB）。引擎和模型从 GitHub 和魔搭社区下载（失败时改用 Hugging Face），保存在 `%LOCALAPPDATA%\com.trovoy.f1radio\local`，下载中断可以续传，不需要的模型可以在软件里删除。
+推理引擎是 llama.cpp：N 卡用 CUDA 版（约 680 MB），其他显卡用 Vulkan 版（约 38 MB）。引擎和模型从 GitHub 和魔搭社区下载（失败时改用 Hugging Face），默认保存在 `%LOCALAPPDATA%\com.trovoy.f1radio\local`，可以在 **存放位置** 里改到其他盘（比如 D 盘），已下载的内容会一起搬过去。下载中断可以续传，不需要的模型可以在软件里删除。
 
 ## 从源码构建
 

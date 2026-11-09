@@ -73,6 +73,6 @@ Run one with `cargo test --lib <name> -- --ignored --nocapture`.
 | Data | Location |
 | --- | --- |
 | Settings | `%APPDATA%\com.trovoy.f1radio\settings.json` |
-| Engine and models | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
+| Engine and models | `%LOCALAPPDATA%\com.trovoy.f1radio\local` (changeable in the app) |
 
 [Back to README](../README.md)

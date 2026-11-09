@@ -73,6 +73,6 @@ cargo test --lib
 | 数据 | 位置 |
 | --- | --- |
 | 设置 | `%APPDATA%\com.trovoy.f1radio\settings.json` |
-| 引擎和模型 | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
+| 引擎和模型 | `%LOCALAPPDATA%\com.trovoy.f1radio\local`（可在软件里更改） |
 
 [返回 README](../README.zh-CN.md)

@@ -29,7 +29,7 @@ Besides the translation service you configure, the app only connects to GitHub (
 | --- | --- |
 | Settings: region, service order, style, window positions | `%APPDATA%\com.trovoy.f1radio\settings.json` |
 | API keys and secrets | Same file, encrypted with the current Windows user's DPAPI |
-| Local engine, models, engine log | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
+| Local engine, models, engine log | `%LOCALAPPDATA%\com.trovoy.f1radio\local`, or the folder chosen under 存放位置 |
 
 Base URLs and model names are stored as plain settings, so do not embed secrets in a URL. Uninstalling the app leaves these folders; delete them to remove all data.
 

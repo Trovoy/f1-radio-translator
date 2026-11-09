@@ -227,7 +227,7 @@ fn hymt_prompt_carries_terms_names_and_context() {
 #[ignore = "downloads gigabytes and uses the GPU"]
 async fn local_model_end_to_end() {
     let root = std::path::PathBuf::from(std::env::var("LOCALAPPDATA").unwrap()).join("com.trovoy.f1radio/local");
-    crate::local::init(root);
+    crate::local::init(root, None);
     let id = std::env::var("F1RADIO_LOCAL_MODEL").unwrap_or_else(|_| "hy-mt-1.8b".into());
     crate::local::get().download(None, &id).await.expect("download");
     let t0 = std::time::Instant::now();
@@ -255,4 +255,32 @@ async fn local_model_end_to_end() {
     println!("[stats] load {}ms · avg {}ms · gen {:.0} tok/s · prompt {:.0} tok/s · first {}ms · {} tokens", s.load_ms, s.avg_ms, s.gen_tps, s.prompt_tps, s.first_ms, s.tokens);
     println!("[gpu] {:?}", crate::local::gpu().map(|g| (g.used_mb, g.total_mb, g.util)));
     crate::local::get().stop().await;
+}
+
+#[test]
+fn model_folder_moves_within_and_across_drives() {
+    use std::fs;
+    let stamp = std::process::id();
+    let same_a = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(format!("target-test/move-{stamp}/a"));
+    let same_b = same_a.with_file_name("b");
+    // %TEMP% is on C: and the project on D: here, so the second move has to copy.
+    let other = std::env::temp_dir().join(format!("f1radio-move-{stamp}"));
+    let _ = fs::remove_dir_all(same_a.parent().unwrap());
+    let _ = fs::remove_dir_all(&other);
+    fs::create_dir_all(same_a.join("models")).unwrap();
+    fs::create_dir_all(same_a.join("engine/b1/bin")).unwrap();
+    fs::write(same_a.join("models/m.gguf"), vec![7u8; 5 << 20]).unwrap();
+    fs::write(same_a.join("engine/b1/bin/llama-server.exe"), b"exe").unwrap();
+    fs::write(same_a.join("server.log"), b"log").unwrap();
+
+    crate::local::move_tree(&same_a, &same_b).unwrap();
+    assert!(!same_a.exists(), "old folder is removed");
+    assert_eq!(fs::metadata(same_b.join("models/m.gguf")).unwrap().len(), 5 << 20);
+
+    crate::local::move_tree(&same_b, &other).unwrap();
+    assert!(!same_b.exists());
+    assert_eq!(fs::read(other.join("models/m.gguf")).unwrap(), vec![7u8; 5 << 20]);
+    assert_eq!(fs::read(other.join("engine/b1/bin/llama-server.exe")).unwrap(), b"exe");
+    let _ = fs::remove_dir_all(same_a.parent().unwrap());
+    let _ = fs::remove_dir_all(&other);
 }

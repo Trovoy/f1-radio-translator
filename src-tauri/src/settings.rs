@@ -56,6 +56,8 @@ pub struct Settings {
     pub overlay: Option<WindowRect>,
     /// Where the main window was last left.
     pub main_window: Option<WindowRect>,
+    /// Folder for the local engine and models; none means the app's own data folder.
+    pub model_dir: Option<String>,
 }
 
 impl Default for Settings {
@@ -71,6 +73,7 @@ impl Default for Settings {
             auto_fallback: true,
             overlay: None,
             main_window: None,
+            model_dir: None,
         }
     }
 }

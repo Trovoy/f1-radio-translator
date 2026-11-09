@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 2.0.1
+
+- Choose where local models are stored (for example on drive D); the engine and models already downloaded are moved there, with progress across drives.
+- Shows the free space on that drive.
+
 ## 2.0.0 — Full rewrite
 
 - Rewritten in Tauri 2 and Rust; no Python. The installer is under 3 MB.

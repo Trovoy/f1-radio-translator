@@ -25,7 +25,7 @@ Version 2.0 is a full rewrite in Tauri 2 and Rust. It no longer needs Python, an
 
 ## Quick start
 
-1. Download and run `F1-Radio_2.0.0_x64-setup.exe` from [Releases](https://github.com/Trovoy/f1-radio-translator/releases).
+1. Download and run `F1-Radio_<version>_x64-setup.exe` from [Releases](https://github.com/Trovoy/f1-radio-translator/releases).
 2. In MultiViewer, open **AI Radio Transcriptions**.
 3. In the app, open **识别区域** (capture region) and draw a box around the transcript cards.
 4. Under **翻译服务** (translation services), configure a service. MyMemory works without a key. To translate offline, open **本地与自建 → 本地模型（显卡）** (local and self-hosted → local model), download a model, click **使用此模型** (use this model), then **设为主用** (set as primary).
@@ -52,7 +52,7 @@ Windows OCR needs the English (United States) language. If the app reports a mis
 | HY-MT1.5 7B | 4.6 GB | ~6 GB | Tencent's translation model; literal on fragmented radio lines. |
 | HY-MT1.5 1.8B | 1.1 GB | ~2 GB | Very fast, lower quality; for weak GPUs. |
 
-On NVIDIA cards, the engine is llama.cpp's CUDA build (about 680 MB). Other GPUs get the Vulkan build (about 38 MB). The engine and models are downloaded from GitHub and ModelScope (with Hugging Face as a fallback) into `%LOCALAPPDATA%\com.trovoy.f1radio\local`. Downloads resume after an interruption. Models can be deleted in the app.
+On NVIDIA cards, the engine is llama.cpp's CUDA build (about 680 MB). Other GPUs get the Vulkan build (about 38 MB). The engine and models are downloaded from GitHub and ModelScope (with Hugging Face as a fallback) into `%LOCALAPPDATA%\com.trovoy.f1radio\local` by default. Pick another folder (for example on drive D) under **存放位置** (storage location) and the app moves what is already downloaded. Downloads resume after an interruption. Models can be deleted in the app.
 
 ## Build from source
 

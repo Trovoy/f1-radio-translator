@@ -29,7 +29,7 @@
 | --- | --- |
 | 设置：识别区域、服务顺序、字幕样式、窗口位置 | `%APPDATA%\com.trovoy.f1radio\settings.json` |
 | API 密钥等敏感字段 | 同一文件，用当前 Windows 用户的 DPAPI 加密 |
-| 本地引擎、模型、引擎日志 | `%LOCALAPPDATA%\com.trovoy.f1radio\local` |
+| 本地引擎、模型、引擎日志 | `%LOCALAPPDATA%\com.trovoy.f1radio\local`，或在“存放位置”里选的文件夹 |
 
 Base URL 和模型名按普通设置保存，不要把密钥写进地址里。卸载软件不会删除这些文件夹，想清除全部数据请手动删除。
 

@@ -1,6 +1,6 @@
 //! Built-in local translation: llama.cpp's `llama-server` runs a GGUF model on the GPU.
-//! The engine and models are downloaded on first use into
-//! `%LOCALAPPDATA%\com.trovoy.f1radio\local`, so the installer stays small.
+//! The engine and models are downloaded on first use into `%LOCALAPPDATA%\com.trovoy.f1radio\local`,
+//! or a folder the user picks (e.g. on another drive), so the installer stays small.
 
 use futures_util::StreamExt;
 use serde::Serialize;
@@ -133,7 +133,8 @@ struct Server {
 }
 
 pub struct Local {
-    root: PathBuf,
+    root: Mutex<PathBuf>,
+    default_root: PathBuf,
     server: tokio::sync::Mutex<Option<Server>>,
     downloading: Mutex<Option<String>>,
     cancel: AtomicBool,
@@ -142,9 +143,11 @@ pub struct Local {
 
 static LOCAL: OnceLock<Local> = OnceLock::new();
 
-pub fn init(root: PathBuf) {
+/// `chosen` is the folder from the settings; without one the app's own data folder is used.
+pub fn init(default_root: PathBuf, chosen: Option<PathBuf>) {
     let _ = LOCAL.set(Local {
-        root,
+        root: Mutex::new(chosen.unwrap_or_else(|| default_root.clone())),
+        default_root,
         server: tokio::sync::Mutex::new(None),
         downloading: Mutex::new(None),
         cancel: AtomicBool::new(false),
@@ -240,12 +243,20 @@ struct Progress {
 }
 
 impl Local {
+    pub fn root(&self) -> PathBuf {
+        self.root.lock().unwrap().clone()
+    }
+
+    pub fn default_root(&self) -> &Path {
+        &self.default_root
+    }
+
     fn engine_dir(&self) -> PathBuf {
-        self.root.join("engine").join(format!("{BUILD}-{}", engine_kind()))
+        self.root().join("engine").join(format!("{BUILD}-{}", engine_kind()))
     }
 
     fn model_path(&self, m: &ModelInfo) -> PathBuf {
-        self.root.join("models").join(m.file)
+        self.root().join("models").join(m.file)
     }
 
     pub fn server_exe(&self) -> Option<PathBuf> {
@@ -303,7 +314,7 @@ impl Local {
             .build()
             .map_err(|e| e.to_string())?;
         if !self.engine_installed() {
-            let dl = self.root.join("downloads");
+            let dl = self.root().join("downloads");
             fs::create_dir_all(&dl).map_err(|e| e.to_string())?;
             let pkgs = packages(engine_kind());
             let total: u64 = pkgs.iter().map(|p| p.size).sum();
@@ -345,6 +356,35 @@ impl Local {
         Ok(())
     }
 
+    /// Moves the engine and models to `target` and uses it from now on.
+    /// Same-drive moves are instant renames; across drives the files are copied with progress.
+    pub async fn relocate(&self, target: PathBuf) -> Result<PathBuf, String> {
+        // A bare drive such as `D:\` gets its own folder instead of filling the drive root.
+        let target = if target.parent().is_none() { target.join("F1 Radio") } else { target };
+        let current = self.root();
+        if same_path(&current, &target) {
+            return Ok(current);
+        }
+        if target.starts_with(&current) || current.starts_with(&target) {
+            return Err("新位置不能在当前位置里面，也不能包含当前位置".into());
+        }
+        {
+            let mut d = self.downloading.lock().unwrap();
+            if d.is_some() {
+                return Err("下载进行中，完成或取消后再更改位置".into());
+            }
+            *d = Some("__move".into());
+        }
+        self.stop().await;
+        let (from, to) = (current.clone(), target.clone());
+        let result = tokio::task::spawn_blocking(move || move_tree(&from, &to)).await.map_err(|e| e.to_string()).and_then(|r| r);
+        *self.downloading.lock().unwrap() = None;
+        result?;
+        *self.root.lock().unwrap() = target.clone();
+        notify("local-changed", ());
+        Ok(target)
+    }
+
     pub async fn delete(&self, id: &str) -> Result<(), String> {
         let m = model(id).ok_or("未知模型")?;
         if self.running().await.as_deref() == Some(id) {
@@ -376,7 +416,7 @@ impl Local {
             return Err(format!("{} 尚未下载", m.name));
         }
         let port = std::net::TcpListener::bind("127.0.0.1:0").and_then(|l| l.local_addr()).map(|a| a.port()).map_err(|e| e.to_string())?;
-        let log_path = self.root.join("server.log");
+        let log_path = self.root().join("server.log");
         let log = File::create(&log_path).map_err(|e| e.to_string())?;
         let log2 = log.try_clone().map_err(|e| e.to_string())?;
         let mut cmd = Command::new(&exe);
@@ -594,6 +634,96 @@ async fn fetch(
         }
     }
     Err(last_err)
+}
+
+fn same_path(a: &Path, b: &Path) -> bool {
+    let norm = |p: &Path| p.to_string_lossy().trim_end_matches(['\\', '/']).to_lowercase();
+    norm(a) == norm(b)
+}
+
+/// Every file under `dir`, with its size.
+fn walk(dir: &Path, out: &mut Vec<(PathBuf, u64)>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for e in entries.flatten() {
+        let p = e.path();
+        match e.metadata() {
+            Ok(m) if m.is_dir() => walk(&p, out),
+            Ok(m) => out.push((p, m.len())),
+            Err(_) => {}
+        }
+    }
+}
+
+/// Moves `engine`, `models` and unfinished `downloads` from one root to another, then tidies the old root.
+pub(crate) fn move_tree(from: &Path, to: &Path) -> Result<(), String> {
+    fs::create_dir_all(to).map_err(|e| format!("无法创建文件夹：{e}"))?;
+    let probe = to.join(".write-test");
+    fs::write(&probe, b"").map_err(|e| format!("这个位置不能写入：{e}"))?;
+    let _ = fs::remove_file(&probe);
+
+    let mut files = Vec::new();
+    for sub in ["engine", "models", "downloads"] {
+        walk(&from.join(sub), &mut files);
+    }
+    let total: u64 = files.iter().map(|(_, n)| n).sum();
+    let mut done = 0u64;
+    let started = Instant::now();
+    let mut last = Instant::now() - Duration::from_secs(1);
+    for (src, len) in &files {
+        let rel = src.strip_prefix(from).map_err(|e| e.to_string())?;
+        let dst = to.join(rel);
+        if let Some(dir) = dst.parent() {
+            fs::create_dir_all(dir).map_err(|e| format!("无法创建文件夹：{e}"))?;
+        }
+        if fs::metadata(&dst).is_ok_and(|m| m.len() == *len) {
+            // Already there (an earlier move was interrupted): keep the copy at the target.
+            let _ = fs::remove_file(src);
+        } else if fs::rename(src, &dst).is_err() {
+            // Different drive: copy in chunks so the page can show progress.
+            let mut r = File::open(src).map_err(|e| e.to_string())?;
+            let part = dst.with_extension("moving");
+            let mut w = File::create(&part).map_err(|e| format!("写入失败：{e}"))?;
+            let mut buf = vec![0u8; 4 << 20];
+            loop {
+                let n = std::io::Read::read(&mut r, &mut buf).map_err(|e| e.to_string())?;
+                if n == 0 {
+                    break;
+                }
+                w.write_all(&buf[..n]).map_err(|e| format!("写入失败（磁盘空间够吗？）：{e}"))?;
+                done += n as u64;
+                if last.elapsed() > Duration::from_millis(250) {
+                    last = Instant::now();
+                    let secs = started.elapsed().as_secs_f64().max(0.001);
+                    notify("local-progress", Progress { task: "move", model: "__move".into(), label: "正在移动".into(), done, total, speed: done as f64 / secs });
+                }
+            }
+            w.sync_all().map_err(|e| e.to_string())?;
+            drop(w);
+            fs::rename(&part, &dst).map_err(|e| e.to_string())?;
+            fs::remove_file(src).map_err(|e| format!("已复制，但无法删除原文件：{e}"))?;
+            continue;
+        }
+        done += len;
+    }
+    for sub in ["engine", "models", "downloads"] {
+        let _ = fs::remove_dir_all(from.join(sub));
+    }
+    let _ = fs::remove_file(from.join("server.log"));
+    let _ = fs::remove_dir(from);
+    Ok(())
+}
+
+/// Free space on the drive holding `path` (or its nearest existing parent).
+pub fn free_bytes(path: &Path) -> Option<u64> {
+    use windows::core::HSTRING;
+    use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+    let mut p = path;
+    while !p.exists() {
+        p = p.parent()?;
+    }
+    let mut free = 0u64;
+    unsafe { GetDiskFreeSpaceExW(&HSTRING::from(p.as_os_str()), Some(&mut free), None, None) }.ok()?;
+    Some(free)
 }
 
 fn find_file(dir: &Path, name: &str, depth: u32) -> Option<PathBuf> {
