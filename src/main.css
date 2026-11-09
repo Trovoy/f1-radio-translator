@@ -154,14 +154,51 @@ kbd { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-xs); p
 .page > .acts { margin-top: var(--s5); }
 
 /* ── services ── */
-.chain { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; margin-top: var(--s5); }
-.chain .c { height: 30px; padding: 0 var(--s2) 0 var(--s3); border-radius: 999px; display: inline-flex; align-items: center; gap: var(--s1); font-size: var(--fs-md); background: var(--fill-2); color: var(--ink-2); }
-.chain .c:first-child { background: var(--ink); color: #141416; font-weight: 600; }
-.chain .c button { border: 0; background: none; color: inherit; opacity: .55; width: 18px; height: 18px; border-radius: 50%; font-size: var(--fs-xs); line-height: 1; }
-.chain .c button:hover { opacity: 1; background: rgba(0, 0, 0, .12); }
-.chain .arr { color: var(--ink-3); font-size: var(--fs-sm); }
-.chain .c.in { animation: pop .5s var(--spring) both; }
-@keyframes pop { from { opacity: 0; transform: scale(.8); } }
+/* Service order as a topology. Lines are drawn under opaque nodes; the primary route carries flowing light. */
+.topo { position: relative; margin-top: var(--s5); border-radius: var(--r-xl); overflow: hidden; user-select: none; touch-action: none;
+  background: radial-gradient(420px 160px at 50% 50%, rgba(255, 255, 255, .035), transparent 70%), var(--surface); box-shadow: var(--surface-edge); }
+.topo-lines { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.topo-lines path { fill: none; stroke-linecap: round; }
+.topo-lines .base { stroke: rgba(255, 255, 255, .07); stroke-width: 1; }
+.topo-lines .flow { stroke-width: 1.7; stroke-dasharray: 0 8; }
+.topo-lines .flow.act { stroke: rgba(244, 242, 238, .5); }
+.topo-lines .flow.bk { stroke: rgba(244, 242, 238, .16); }
+.live-on .topo-lines .flow.act { stroke: rgba(244, 242, 238, .85); filter: drop-shadow(0 0 2px rgba(255, 255, 255, .55)); animation: flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -8; } }
+.topo-lines .pulse { stroke: #fff; stroke-width: 2.2; filter: drop-shadow(0 0 5px rgba(255, 255, 255, .9)); }
+.tio { position: absolute; top: 50%; width: 44px; height: 44px; margin-top: -22px; border-radius: 50%; display: grid; place-items: center; color: var(--ink);
+  background: #19191c; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), inset 0 0 0 1px rgba(255, 255, 255, .09), 0 8px 20px -10px rgba(0, 0, 0, .9); }
+.tio.in { left: 22px; }
+.tio.out { right: 22px; }
+.tio .ic { width: 20px; height: 20px; }
+.live-on .tio .ic path.r { stroke: var(--red); filter: drop-shadow(0 0 3px rgba(255, 77, 61, .8)); }
+.tio span { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); font-size: var(--fs-xs); color: var(--ink-3); white-space: nowrap; }
+.tn { position: absolute; left: calc(50% - 118px); top: 0; width: 236px; height: 46px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 6px;
+  border-radius: 12px; background: #19191c; cursor: grab; transition: transform .45s var(--spring), box-shadow .25s var(--ease);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), inset 0 0 0 1px rgba(255, 255, 255, .08), 0 8px 20px -10px rgba(0, 0, 0, .9); }
+.tn.pri { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 0 0 1px rgba(255, 255, 255, .24), 0 0 0 4px rgba(255, 255, 255, .025), 0 10px 26px -10px rgba(0, 0, 0, .9); }
+.tn.drag { cursor: grabbing; z-index: 3; transition: box-shadow .25s var(--ease);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .1), inset 0 0 0 1px rgba(255, 255, 255, .3), 0 22px 44px -14px rgba(0, 0, 0, .95); }
+.dragging .tn:not(.drag) { opacity: .8; }
+.tn.fresh { animation: tn-in .5s var(--ease) both; }
+@keyframes tn-in { from { opacity: 0; filter: blur(6px); } }
+.tn.hit { animation: tn-hit .7s var(--ease); }
+@keyframes tn-hit { 30% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), inset 0 0 0 1px rgba(255, 255, 255, .5), 0 0 18px rgba(255, 255, 255, .12); } }
+.tg-grip { width: 10px; height: 16px; flex: none; color: var(--ink-3); opacity: .6; }
+.tg-grip svg { display: block; width: 10px; height: 16px; }
+.tn .tt { min-width: 0; flex: 1; display: flex; flex-direction: column; line-height: 1.25; }
+.tn .tt b { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tn .tt small { font-size: var(--fs-xs); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tn .tt small .warn { color: var(--warn); }
+.tn .role { flex: none; font-size: var(--fs-xs); line-height: 1; padding: 5px 9px; border-radius: 999px; background: rgba(255, 255, 255, .06); color: var(--ink-2); }
+.tn.pri .role { background: var(--ink); color: #141416; font-weight: 600; }
+.tn [data-rm] { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; font-size: 9px; line-height: 18px;
+  background: #2b2b30; color: var(--ink-2); box-shadow: 0 0 0 1px rgba(255, 255, 255, .1); opacity: 0; transform: scale(.8); transition: opacity .2s, transform .3s var(--spring); }
+.tn:hover [data-rm] { opacity: 1; transform: none; }
+.tn [data-rm]:hover { background: #e5372a; color: #fff; }
+.dragging [data-rm] { display: none; }
+.tlat { position: absolute; transform: translate(-50%, -50%); padding: 2px 8px; border-radius: 999px; font-size: var(--fs-xs); color: var(--ink-2); font-variant-numeric: tabular-nums;
+  background: #141416; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1); pointer-events: none; }
 #catSeg { margin-top: var(--s6); }
 .plist { margin-top: var(--s3); }
 .pv { border-top: 1px solid var(--line); }

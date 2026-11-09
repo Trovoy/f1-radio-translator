@@ -11,6 +11,7 @@
 - Reselecting the capture region starts from a clean screen; the old region stays until a new one is confirmed.
 - Visual polish: deeper layered background, hairline window frame, monochrome switches, lighter surfaces with a lit top edge, editorial home numbers and an on-air dot while translating.
 - The sidebar collapses to an icon rail (remembered between launches), and its icons were redrawn in the logo's line style with a dot that lights red on the current page.
+- The service order is now a live topology (transcript → services → subtitle window): drag nodes to reorder, click one to open its settings; the primary route carries flowing light while translating, and each translated line lights the route it took with its latency.
 
 ## 2.0.0 — Full rewrite
 

@@ -219,6 +219,8 @@ listen("radio-translated", ({ payload }) => {
   const l = lines.get(payload.id);
   if (!l) return;
   Object.assign(l, { zh: payload.zh, ms: payload.ms, pending: false });
+  provMs[payload.provider] = payload.ms;
+  if (settings) { layoutTopo(false); pulseTopo(payload.provider); }
   queue = Math.max(0, queue - 1);
   stats();
   addRecent(l);
@@ -274,15 +276,154 @@ wave();
 let cat = "mt", open = null;
 const CK = `<svg class="ck" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>`;
 
+// ── service order as a live topology: transcript → services, top to bottom → subtitle window ──
+const topo = $("#chain");
+const T = { row: 58, h: 46, w: 236 };
+const provMs = {};   // provider id -> latency of its last translated line
+const TIC = {
+  in: '<svg class="ic" viewBox="0 0 24 24"><path d="M8.6 8.6a4.8 4.8 0 0 0 0 6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8"/><path class="r" d="M12 12h.01"/></svg>',
+  out: '<svg class="ic" viewBox="0 0 24 24"><path d="M7 4.5h10a3.5 3.5 0 0 1 3.5 3.5v8a3.5 3.5 0 0 1-3.5 3.5H7A3.5 3.5 0 0 1 3.5 16V8A3.5 3.5 0 0 1 7 4.5Z"/><path d="M10.5 15.5h6M8.5 12.2h7"/><path class="r" d="M7.6 15.5h.01"/></svg>',
+  grip: '<svg viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="4" r="1"/><circle cx="7" cy="4" r="1"/><circle cx="3" cy="8" r="1"/><circle cx="7" cy="8" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="7" cy="12" r="1"/></svg>',
+};
+let tdrag = null;    // { id, from, to, y0, dy, moved, node }
+
+function topoSub(id, i) {
+  if (!isConfigured(settings, id)) return '<span class="warn">未配置</span>';
+  if (provMs[id] != null) return `最近 ${(provMs[id] / 1000).toFixed(2)} 秒`;
+  return i === 0 ? "优先使用" : "主用失败时接手";
+}
+
 function renderChain(fresh) {
-  $("#chain").innerHTML = settings.chain.map((id, i) =>
-    `${i ? '<span class="arr">→</span>' : ""}<span class="c${id === fresh ? " in" : ""}">${escapeHtml(providerName(id))}${settings.chain.length > 1 ? `<button data-rm="${id}" title="移出顺序" aria-label="移出">✕</button>` : ""}</span>`
-  ).join("");
+  const n = settings.chain.length;
+  topo.style.height = `${Math.max(150, (n - 1) * T.row + T.h + 52)}px`;
+  topo.innerHTML = '<svg class="topo-lines" aria-hidden="true"></svg>'
+    + `<div class="tio in">${TIC.in}<span>转录</span></div><div class="tio out">${TIC.out}<span>字幕窗</span></div>`
+    + '<span class="tlat" hidden></span>'
+    + settings.chain.map((id) => `<div class="tn${id === fresh ? " fresh" : ""}" data-id="${id}">`
+      + `<span class="tg-grip">${TIC.grip}</span><span class="tt"><b>${escapeHtml(providerName(id))}</b><small></small></span><span class="role"></span>`
+      + (n > 1 ? `<button data-rm="${id}" title="移出顺序" aria-label="移出">✕</button>` : "") + "</div>").join("");
+  layoutTopo(false);
   homeSub();
   renderHomeLocal();
 }
-$("#chain").addEventListener("click", (e) => {
-  const id = e.target.dataset.rm;
+
+/** Places the nodes for the current (or dragged) order, then redraws the lines as they settle. */
+function layoutTopo(animate = true) {
+  const n = settings.chain.length, H = parseFloat(topo.style.height);
+  const top0 = (H - ((n - 1) * T.row + T.h)) / 2;
+  const order = [...settings.chain];
+  if (tdrag) { order.splice(tdrag.from, 1); order.splice(tdrag.to, 0, tdrag.id); }
+  topo.querySelectorAll(".tn").forEach((el) => {
+    const id = el.dataset.id, slot = order.indexOf(id);
+    const y = tdrag?.id === id ? top0 + tdrag.from * T.row + tdrag.dy : top0 + slot * T.row;
+    if (!animate) el.style.transition = "none";
+    el.style.transform = `translateY(${y}px)`;
+    if (!animate) { void el.offsetWidth; el.style.transition = ""; }
+    el.classList.toggle("pri", slot === 0);
+    el.querySelector(".role").textContent = slot === 0 ? "主用" : `备用 ${slot}`;
+    el.querySelector("small").innerHTML = topoSub(id, slot);
+  });
+  followLines(animate ? 480 : 0);
+}
+
+let linesUntil = 0, linesRaf = 0;
+function followLines(ms) {
+  linesUntil = Math.max(linesUntil, performance.now() + ms);
+  if (linesRaf) return;
+  const tick = () => { drawLines(); linesRaf = performance.now() < linesUntil || tdrag ? requestAnimationFrame(tick) : 0; };
+  tick();
+}
+
+function drawLines() {
+  const svg = topo.querySelector(".topo-lines");
+  if (!svg || !topo.offsetParent) return;
+  const b = topo.getBoundingClientRect();
+  const port = (el, side) => { const r = el.getBoundingClientRect(); return [side === "l" ? r.left - b.left : r.right - b.left, r.top - b.top + r.height / 2]; };
+  const [ix, iy] = port(topo.querySelector(".tio.in"), "r"), [ox, oy] = port(topo.querySelector(".tio.out"), "l");
+  const curve = ([x1, y1], [x2, y2]) => { const d = (x2 - x1) * .55; return `M${x1} ${y1}C${x1 + d} ${y1} ${x2 - d} ${y2} ${x2} ${y2}`; };
+  let out = "";
+  let pri = null;
+  topo.querySelectorAll(".tn").forEach((el) => {
+    const id = el.dataset.id, cls = el.classList.contains("pri") ? "act" : "bk";
+    const a = curve([ix + 6, iy], port(el, "l")), z = curve(port(el, "r"), [ox - 6, oy]);
+    if (cls === "act") pri = { id, z };
+    for (const [edge, d] of [["i", a], ["o", z]]) {
+      out += `<path class="base" d="${d}"/><path class="flow ${cls}" data-e="${edge}-${id}" d="${d}"/>`;
+    }
+  });
+  svg.innerHTML = out;
+  // Latency of the primary service, on its outgoing line.
+  const lat = topo.querySelector(".tlat");
+  const ms = pri && provMs[pri.id];
+  lat.hidden = !ms;
+  if (ms) {
+    const p = svg.querySelector(`[data-e="o-${pri.id}"]`), m = p.getPointAtLength(p.getTotalLength() / 2);
+    lat.textContent = `${(ms / 1000).toFixed(2)} 秒`;
+    lat.style.left = `${m.x}px`; lat.style.top = `${m.y}px`;
+  }
+}
+
+/** A light travels the route a translated line actually took. */
+function pulseTopo(id) {
+  if (RM || !topo.offsetParent || tdrag) return;
+  ["i", "o"].forEach((edge, k) => {
+    const p = topo.querySelector(`.topo-lines [data-e="${edge}-${id}"]`);
+    if (!p) return;
+    const len = p.getTotalLength(), c = p.cloneNode();
+    c.setAttribute("class", "pulse");
+    p.parentNode.appendChild(c);
+    c.animate([{ strokeDasharray: `28 ${len}`, strokeDashoffset: 28 }, { strokeDasharray: `28 ${len}`, strokeDashoffset: -len }],
+      { duration: 650, delay: k * 520, easing: "cubic-bezier(.4, 0, .2, 1)", fill: "both" }).onfinish = () => c.remove();
+  });
+  const node = topo.querySelector(`.tn[data-id="${id}"]`);
+  if (node) setTimeout(() => { node.classList.remove("hit"); void node.offsetWidth; node.classList.add("hit"); }, 480);
+}
+
+topo.addEventListener("pointerdown", (e) => {
+  const node = e.target.closest(".tn");
+  if (!node || e.button !== 0 || e.target.closest("[data-rm]")) return;
+  const from = settings.chain.indexOf(node.dataset.id);
+  tdrag = { id: node.dataset.id, from, to: from, y0: e.clientY, dy: 0, moved: false, node };
+  node.setPointerCapture(e.pointerId);
+});
+topo.addEventListener("pointermove", (e) => {
+  if (!tdrag) return;
+  const n = settings.chain.length, dy = e.clientY - tdrag.y0;
+  if (!tdrag.moved && Math.abs(dy) < 4) return;
+  if (!tdrag.moved) { tdrag.moved = true; tdrag.node.classList.add("drag"); topo.classList.add("dragging"); }
+  const min = -tdrag.from * T.row - 10, max = (n - 1 - tdrag.from) * T.row + 10;
+  tdrag.dy = Math.max(min, Math.min(max, dy));
+  tdrag.to = Math.max(0, Math.min(n - 1, Math.round(tdrag.from + tdrag.dy / T.row)));
+  layoutTopo();
+});
+const endDrag = () => {
+  if (!tdrag) return;
+  const d = tdrag; tdrag = null;
+  d.node.classList.remove("drag"); topo.classList.remove("dragging");
+  if (!d.moved) { showProvider(d.id); return; }
+  if (d.to !== d.from) {
+    const order = [...settings.chain]; order.splice(d.from, 1); order.splice(d.to, 0, d.id);
+    settings.chain = order;
+    saveSoon(); renderList(false);
+  }
+  layoutTopo();
+};
+topo.addEventListener("pointerup", endDrag);
+topo.addEventListener("pointercancel", endDrag);
+new ResizeObserver(() => followLines(0)).observe(topo);
+
+/** Clicking a node opens that service's settings in the list below. */
+function showProvider(id) {
+  const c = PROVIDER[id]?.c;
+  if (!c) return;
+  if (c !== cat) $(`#catSeg button[data-c="${c}"]`)?.click();
+  open = id;
+  renderList(false);
+  requestAnimationFrame(() => $(`#plist .pv[data-id="${id}"]`)?.scrollIntoView({ behavior: RM ? "auto" : "smooth", block: "center" }));
+}
+
+topo.addEventListener("click", (e) => {
+  const id = e.target.closest("[data-rm]")?.dataset.rm;
   if (!id || settings.chain.length < 2) return;
   settings.chain = settings.chain.filter((x) => x !== id);
   renderChain(); renderList(false); saveSoon();

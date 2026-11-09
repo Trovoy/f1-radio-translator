@@ -60,8 +60,8 @@
 
       <!-- SERVICES -->
       <section class="page" id="p-svc" hidden>
-        <div class="ph"><span class="k">24 家可选</span><h3>翻译服务</h3><p>按顺序使用，前一个失败或被限流时自动换下一个。</p></div>
-        <div class="chain" id="chain"></div>
+        <div class="ph"><span class="k">24 家可选</span><h3>翻译服务</h3><p>从上到下依次使用，前一个失败或被限流时自动换下一个。拖动节点调整顺序，点击查看设置。</p></div>
+        <div class="topo" id="chain"></div>
         <div class="group">
           <div class="row"><span>失败时自动切换<small>关闭后只用第一个</small></span><button class="tg" role="switch" id="tFallback" aria-label="失败时自动切换"></button></div>
           <div class="row"><span>大模型带上下文<small>附上同一说话人的前 2 句</small></span><button class="tg" role="switch" id="tContext" aria-label="带上下文"></button></div>
