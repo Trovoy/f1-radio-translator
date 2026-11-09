@@ -6,6 +6,8 @@
 
 - Choose where local models are stored (for example on drive D); the engine and models already downloaded are moved there, with progress across drives.
 - Shows the free space on that drive.
+- The overview shows the local model's speed, VRAM and GPU load while it is the primary service.
+- The subtitle window's toolbar has a hide button (show it again with Ctrl Alt H or from the main window).
 
 ## 2.0.0 — Full rewrite
 

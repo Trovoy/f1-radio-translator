@@ -124,6 +124,7 @@ $("#play").onclick = () => invoke("engine_cmd", { action: "toggle" });
 $("#stop").onclick = () => invoke("engine_cmd", { action: "stop" });
 $("#settings").onclick = () => invoke("open_main", { page: "style" });
 $("#lock").onclick = () => invoke("set_overlay_locked", { locked: true });
+$("#hide").onclick = () => invoke("set_overlay_visible", { visible: false });
 
 let toastTimer;
 function toast(text) {
