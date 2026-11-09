@@ -8,6 +8,8 @@
 - Shows the free space on that drive.
 - The overview shows the local model's speed, VRAM and GPU load while it is the primary service.
 - The subtitle window's toolbar has a hide button (show it again with Ctrl Alt H or from the main window).
+- Reselecting the capture region starts from a clean screen; the old region stays until a new one is confirmed.
+- Visual polish: deeper layered background, hairline window frame, monochrome switches, lighter surfaces with a lit top edge, editorial home numbers and an on-air dot while translating.
 
 ## 2.0.0 — Full rewrite
 

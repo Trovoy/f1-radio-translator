@@ -93,9 +93,10 @@ document.addEventListener("keydown", (e) => {
   if (move) { e.preventDefault(); rect = clamp({ ...rect, x: rect.x + move[0], y: rect.y + move[1] }); render(); }
 });
 
-invoke("selector_info").then(({ region, origin: o }) => {
+// Reselecting starts from a clean screen: the old box is not drawn. It stays saved until a new one
+// is confirmed, so Esc still leaves the previous region in place.
+invoke("selector_info").then(({ origin: o }) => {
   if (o) origin = o;
-  if (region && region.w > 0) { rect = clamp({ ...region }); render(); }
 });
 // Tell the backend the page is painted; only then does it hide the other windows.
 requestAnimationFrame(() => requestAnimationFrame(() => invoke("selector_ready")));

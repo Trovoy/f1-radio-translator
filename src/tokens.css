@@ -26,7 +26,10 @@
   --fs-2xl: 28px;  /* status title, big numbers */
   /* Spacing: multiples of 4. */
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
-  --r-sm: 6px; --r-md: 8px; --r-lg: 10px;
+  --r-sm: 6px; --r-md: 8px; --r-lg: 10px; --r-xl: 14px;
+  /* Raised surface: faint fill, hairline, and a top edge that catches the light. */
+  --surface: linear-gradient(180deg, rgba(255, 255, 255, .04), rgba(255, 255, 255, .022));
+  --surface-edge: inset 0 1px 0 rgba(255, 255, 255, .06), inset 0 0 0 1px rgba(255, 255, 255, .06), 0 12px 32px -18px rgba(0, 0, 0, .7);
   --ease: cubic-bezier(.2, .8, .2, 1);
   --spring: cubic-bezier(.34, 1.4, .64, 1);
   color-scheme: dark;
