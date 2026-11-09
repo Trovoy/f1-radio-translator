@@ -11,7 +11,6 @@ use settings::{Region, Settings, Style, WindowRect};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
     AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindowBuilder,
@@ -28,9 +27,14 @@ fn get_settings(shared: S) -> Settings {
 
 #[tauri::command]
 fn save_settings(app: AppHandle, shared: S, settings: Settings) -> Result<(), String> {
-    let overlay = shared.settings.lock().unwrap().overlay;
+    // Window positions are owned by the backend; the page's copy may be stale.
+    let (overlay, main_window) = {
+        let s = shared.settings.lock().unwrap();
+        (s.overlay, s.main_window)
+    };
     let mut next = settings;
     next.overlay = overlay;
+    next.main_window = main_window;
     *shared.settings.lock().unwrap() = next.clone();
     shared.save()?;
     let _ = app.emit("settings-changed", next);
@@ -49,6 +53,7 @@ fn update_style(app: AppHandle, shared: S, style: Style) -> Result<(), String> {
 struct Snapshot {
     state: RunState,
     locked: bool,
+    overlay_visible: bool,
     ocr: String,
 }
 
@@ -57,6 +62,7 @@ fn get_state(shared: S) -> Snapshot {
     Snapshot {
         state: shared.run_state(),
         locked: shared.locked.load(Ordering::SeqCst),
+        overlay_visible: !shared.overlay_hidden.load(Ordering::SeqCst),
         ocr: shared.ocr_language.lock().unwrap().clone(),
     }
 }
@@ -153,62 +159,64 @@ fn open_main(app: AppHandle, page: Option<String>) {
     show_main(&app, page);
 }
 
-// ── region selector ──
+// ── region selector: one window per monitor, draw on whichever holds MultiViewer ──
 
 static SELECTOR_READY: AtomicBool = AtomicBool::new(false);
+
+fn selector_windows(app: &AppHandle) -> Vec<tauri::WebviewWindow> {
+    app.webview_windows().into_iter().filter(|(l, _)| l.starts_with("selector-")).map(|(_, w)| w).collect()
+}
 
 // Must be async: on Windows, creating a webview inside a synchronous command
 // blocks the event loop, which froze the whole desktop under the selector.
 #[tauri::command]
 async fn select_region(app: AppHandle) -> Result<(), String> {
-    if app.get_webview_window("selector").is_some() {
+    if !selector_windows(&app).is_empty() {
         return Ok(());
     }
     let main = app.get_webview_window("main").ok_or("main window missing")?;
-    let monitor = main
-        .current_monitor()
-        .ok()
-        .flatten()
-        .or_else(|| main.primary_monitor().ok().flatten())
-        .ok_or("找不到显示器")?;
-    let (pos, size) = (*monitor.position(), *monitor.size());
+    let monitors = main.available_monitors().map_err(|e| e.to_string())?;
+    if monitors.is_empty() {
+        return Err("找不到显示器".into());
+    }
     SELECTOR_READY.store(false, Ordering::SeqCst);
-    // A global Esc always gets the user out, even if the selector never takes focus.
+    // A global Esc always gets the user out, even if no selector takes focus.
     let _ = app.global_shortcut().register(Shortcut::new(None, Code::Escape));
-    let built = WebviewWindowBuilder::new(&app, "selector", WebviewUrl::App("selector.html".into()))
-        .title("框选识别区域")
-        .decorations(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .resizable(false)
-        .visible(false)
-        .build();
-    let w = match built {
-        Ok(w) => w,
-        Err(e) => {
-            let _ = app.global_shortcut().unregister(Shortcut::new(None, Code::Escape));
-            return Err(format!("无法打开框选界面：{e}"));
-        }
-    };
-    // Physical pixels: logical sizes go wrong when monitors use different scaling.
-    let _ = w.set_position(PhysicalPosition::new(pos.x, pos.y));
-    let _ = w.set_size(PhysicalSize::new(size.width, size.height));
-    let _ = w.show();
-    let _ = w.set_focus();
-    // Watchdog: if the page never reports ready, take the window down again.
+    for (i, m) in monitors.iter().enumerate() {
+        let built = WebviewWindowBuilder::new(&app, format!("selector-{i}"), WebviewUrl::App("selector.html".into()))
+            .title("框选识别区域")
+            .decorations(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .visible(false)
+            .build();
+        let w = match built {
+            Ok(w) => w,
+            Err(e) => {
+                close_selector(&app);
+                return Err(format!("无法打开框选界面：{e}"));
+            }
+        };
+        // Physical pixels: logical sizes go wrong when monitors use different scaling.
+        let _ = w.set_position(PhysicalPosition::new(m.position().x, m.position().y));
+        let _ = w.set_size(PhysicalSize::new(m.size().width, m.size().height));
+        let _ = w.show();
+    }
+    // Watchdog: if no page reports ready, take every selector down again.
     let handle = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_secs(8));
-        if !SELECTOR_READY.load(Ordering::SeqCst) && handle.get_webview_window("selector").is_some() {
+        if !SELECTOR_READY.load(Ordering::SeqCst) && !selector_windows(&handle).is_empty() {
             close_selector(&handle);
         }
     });
     Ok(())
 }
 
-/// Called by the selector page once it is painted; only then are the other windows hidden.
+/// Called by a selector page once it is painted; only then are the other windows hidden.
 #[tauri::command]
 fn selector_ready(app: AppHandle) {
     SELECTOR_READY.store(true, Ordering::SeqCst);
@@ -217,9 +225,6 @@ fn selector_ready(app: AppHandle) {
             let _ = w.hide();
         }
     }
-    if let Some(w) = app.get_webview_window("selector") {
-        let _ = w.set_focus();
-    }
 }
 
 #[derive(Serialize)]
@@ -227,24 +232,34 @@ struct SelectorInfo {
     region: Option<Region>,
 }
 
-/// The saved region in the selector window's own CSS pixels.
+/// The saved region in the calling selector's own CSS pixels, if it lies on that monitor.
 #[tauri::command]
-fn selector_info(app: AppHandle, shared: S) -> SelectorInfo {
+fn selector_info(window: tauri::WebviewWindow, shared: S) -> SelectorInfo {
     let region = shared.settings.lock().unwrap().region;
-    let Some(w) = app.get_webview_window("selector") else { return SelectorInfo { region: None } };
-    let (Ok(origin), Ok(scale)) = (w.inner_position(), w.scale_factor()) else { return SelectorInfo { region: None } };
-    let region = region.map(|r| Region {
-        x: ((r.x - origin.x) as f64 / scale).round() as i32,
-        y: ((r.y - origin.y) as f64 / scale).round() as i32,
-        w: (r.w as f64 / scale).round() as i32,
-        h: (r.h as f64 / scale).round() as i32,
-    });
+    let (Ok(origin), Ok(size), Ok(scale)) = (window.inner_position(), window.inner_size(), window.scale_factor()) else {
+        return SelectorInfo { region: None };
+    };
+    let region = region
+        .filter(|r| {
+            let (cx, cy) = (r.x + r.w / 2, r.y + r.h / 2);
+            cx >= origin.x && cx < origin.x + size.width as i32 && cy >= origin.y && cy < origin.y + size.height as i32
+        })
+        .map(|r| Region {
+            x: ((r.x - origin.x) as f64 / scale).round() as i32,
+            y: ((r.y - origin.y) as f64 / scale).round() as i32,
+            w: (r.w as f64 / scale).round() as i32,
+            h: (r.h as f64 / scale).round() as i32,
+        });
     SelectorInfo { region }
 }
 
 fn close_selector(app: &AppHandle) {
     let _ = app.global_shortcut().unregister(Shortcut::new(None, Code::Escape));
-    if let Some(w) = app.get_webview_window("selector") {
+    let windows = selector_windows(app);
+    if windows.is_empty() {
+        return;
+    }
+    for w in windows {
         let _ = w.destroy();
     }
     let keep_hidden = app.try_state::<Arc<Shared>>().is_some_and(|s| s.overlay_hidden.load(Ordering::SeqCst));
@@ -263,10 +278,14 @@ struct CssRect {
 }
 
 #[tauri::command]
-async fn finish_region(app: AppHandle, shared: State<'_, Arc<Shared>>, rect: CssRect) -> Result<(), String> {
-    let w = app.get_webview_window("selector").ok_or("selector missing")?;
-    let origin = w.inner_position().map_err(|e| e.to_string())?;
-    let scale = w.scale_factor().map_err(|e| e.to_string())?;
+async fn finish_region(
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+    shared: State<'_, Arc<Shared>>,
+    rect: CssRect,
+) -> Result<(), String> {
+    let origin = window.inner_position().map_err(|e| e.to_string())?;
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
     let region = Region {
         x: origin.x + (rect.x * scale).round() as i32,
         y: origin.y + (rect.y * scale).round() as i32,
@@ -292,62 +311,46 @@ async fn cancel_region(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn quit(app: AppHandle, shared: S) {
+    remember_overlay(&app);
     let _ = shared.save();
     app.exit(0);
 }
 
-// ── overlay placement ──
+// ── window placement: each window reopens where it was left ──
 
 fn contains(m: &Monitor, x: i32, y: i32) -> bool {
     let (p, s) = (m.position(), m.size());
     x >= p.x && x < p.x + s.width as i32 && y >= p.y && y < p.y + s.height as i32
 }
 
-/// The monitor every window opens on: the one chosen in settings, else the primary one.
-fn target_monitor(app: &AppHandle, shared: &Shared) -> Option<Monitor> {
-    let main = app.get_webview_window("main")?;
-    let (name, at) = {
-        let s = shared.settings.lock().unwrap();
-        (s.display.clone(), s.display_at)
-    };
-    let all = main.available_monitors().unwrap_or_default();
-    // Position first: Windows can swap DISPLAY1/DISPLAY2 after a reboot.
-    if let Some((x, y)) = at {
-        if let Some(m) = all.iter().find(|m| m.position().x == x && m.position().y == y) {
-            return Some(m.clone());
-        }
-    }
-    if let Some(name) = name {
-        if let Some(m) = all.iter().find(|m| m.name().is_some_and(|n| *n == name)) {
-            return Some(m.clone());
-        }
-    }
-    main.primary_monitor().ok().flatten()
+/// A saved rect is reused only while its centre is still on some monitor (one may have been unplugged).
+fn still_visible(w: &tauri::WebviewWindow, r: &WindowRect) -> bool {
+    let (cx, cy) = (r.x + r.w as i32 / 2, r.y + r.h as i32 / 2);
+    w.available_monitors().unwrap_or_default().iter().any(|m| contains(m, cx, cy))
 }
 
-fn place_main(app: &AppHandle, m: &Monitor) {
+fn place_main(app: &AppHandle, shared: &Shared) {
     let Some(w) = app.get_webview_window("main") else { return };
-    let Ok(size) = w.outer_size() else { return };
-    let (p, s) = (m.position(), m.size());
-    let x = p.x + (s.width.saturating_sub(size.width) / 2) as i32;
-    let y = p.y + (s.height.saturating_sub(size.height) / 2) as i32;
-    let _ = w.set_position(PhysicalPosition::new(x, y));
+    let saved = shared.settings.lock().unwrap().main_window;
+    if let Some(r) = saved.filter(|r| still_visible(&w, r)) {
+        let _ = w.set_size(PhysicalSize::new(r.w, r.h));
+        let _ = w.set_position(PhysicalPosition::new(r.x, r.y));
+    } else if let (Ok(Some(m)), Ok(size)) = (w.primary_monitor(), w.outer_size()) {
+        let (p, s) = (m.position(), m.size());
+        let x = p.x + (s.width.saturating_sub(size.width) / 2) as i32;
+        let y = p.y + (s.height.saturating_sub(size.height) / 2) as i32;
+        let _ = w.set_position(PhysicalPosition::new(x, y));
+    }
+    let _ = w.show();
 }
 
 fn place_overlay(app: &AppHandle, shared: &Shared) {
     let Some(w) = app.get_webview_window("overlay") else { return };
-    let target = target_monitor(app, shared);
-    let mut saved = shared.settings.lock().unwrap().overlay;
-    // Keep a remembered spot only if it is still on the chosen monitor.
-    if let (Some(r), Some(m)) = (saved, target.as_ref()) {
-        if !contains(m, r.x + r.w as i32 / 2, r.y + r.h as i32 / 2) {
-            saved = None;
-        }
-    }
-    if let Some(r) = saved {
+    let saved = shared.settings.lock().unwrap().overlay;
+    if let Some(r) = saved.filter(|r| still_visible(&w, r)) {
         let _ = w.set_size(PhysicalSize::new(r.w, r.h));
         let _ = w.set_position(PhysicalPosition::new(r.x, r.y));
-    } else if let Some(m) = target {
+    } else if let Ok(Some(m)) = w.primary_monitor() {
         let (mp, ms, scale) = (m.position(), m.size(), m.scale_factor());
         let width = ((980.0 * scale) as u32).min(ms.width);
         let height = (260.0 * scale) as u32;
@@ -359,98 +362,57 @@ fn place_overlay(app: &AppHandle, shared: &Shared) {
     let _ = w.show();
 }
 
-#[derive(Serialize)]
-struct Display {
-    name: String,
-    label: String,
-    current: bool,
-}
-
-#[tauri::command]
-fn list_displays(app: AppHandle, shared: S) -> Vec<Display> {
-    let Some(main) = app.get_webview_window("main") else { return vec![] };
-    let primary = main.primary_monitor().ok().flatten();
-    let target = target_monitor(&app, &shared).and_then(|m| m.name().cloned());
-    let mut list: Vec<Monitor> = main.available_monitors().unwrap_or_default();
-    list.sort_by_key(|m| (m.position().x, m.position().y));
-    list.iter()
-        .filter_map(|m| {
-            let name = m.name()?.clone();
-            let s = m.size();
-            let label = match primary.as_ref() {
-                Some(p) if p.name() == m.name() => "主屏幕".to_string(),
-                Some(p) if m.position().x + s.width as i32 <= p.position().x => "左侧副屏".to_string(),
-                Some(p) if m.position().x >= p.position().x + p.size().width as i32 => "右侧副屏".to_string(),
-                _ => "副屏".to_string(),
-            };
-            Some(Display { current: target.as_ref() == Some(&name), label: format!("{label} {}×{}", s.width, s.height), name })
-        })
-        .collect()
-}
-
-/// Moves the main window and the subtitle window to the chosen monitor and remembers it.
-#[tauri::command]
-fn set_display(app: AppHandle, shared: S, name: String) -> Result<(), String> {
-    let at = app
-        .get_webview_window("main")
-        .and_then(|w| w.available_monitors().ok())
-        .and_then(|all| all.into_iter().find(|m| m.name().is_some_and(|n| *n == name)))
-        .map(|m| (m.position().x, m.position().y));
-    let snapshot = {
-        let mut s = shared.settings.lock().unwrap();
-        s.display = Some(name);
-        s.display_at = at;
-        s.overlay = None;
-        s.clone()
-    };
-    shared.save()?;
-    if let Some(m) = target_monitor(&app, &shared) {
-        place_main(&app, &m);
+/// Keeps the latest position of the main window or the overlay in memory; it is written on save/exit.
+fn remember_window(app: &AppHandle, label: &str) {
+    let Some(w) = app.get_webview_window(label) else { return };
+    if w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true) {
+        return;
     }
-    place_overlay(&app, &shared);
-    let _ = app.emit("settings-changed", snapshot);
-    Ok(())
+    let (Ok(p), Ok(s)) = (w.outer_position(), w.outer_size()) else { return };
+    let rect = Some(WindowRect { x: p.x, y: p.y, w: s.width, h: s.height });
+    if let Some(shared) = app.try_state::<Arc<Shared>>() {
+        let mut st = shared.settings.lock().unwrap();
+        if label == "main" { st.main_window = rect } else { st.overlay = rect }
+    }
 }
 
 fn remember_overlay(app: &AppHandle) {
-    let Some(w) = app.get_webview_window("overlay") else { return };
-    let (Ok(p), Ok(s)) = (w.outer_position(), w.outer_size()) else { return };
-    if let Some(shared) = app.try_state::<Arc<Shared>>() {
-        shared.settings.lock().unwrap().overlay = Some(WindowRect { x: p.x, y: p.y, w: s.width, h: s.height });
-    }
+    remember_window(app, "overlay");
+    remember_window(app, "main");
 }
 
 // ── tray & shortcuts ──
 
+/// Opens the styled tray menu window with its bottom-right corner at the cursor, kept on-screen.
+fn show_tray_menu(app: &AppHandle, at: PhysicalPosition<f64>) {
+    let Some(w) = app.get_webview_window("traymenu") else { return };
+    let Ok(size) = w.outer_size() else { return };
+    let (cx, cy) = (at.x as i32, at.y as i32);
+    let mut x = cx - size.width as i32;
+    let mut y = cy - size.height as i32;
+    if let Ok(Some(m)) = w.monitor_from_point(at.x, at.y) {
+        let (p, s) = (m.position(), m.size());
+        x = x.clamp(p.x, p.x + s.width as i32 - size.width as i32);
+        y = y.clamp(p.y, p.y + s.height as i32 - size.height as i32);
+    }
+    let _ = w.set_position(PhysicalPosition::new(x, y));
+    let _ = w.show();
+    let _ = w.set_focus();
+    let _ = app.emit_to("traymenu", "traymenu-open", ());
+}
+
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let show = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
-    let toggle = MenuItem::with_id(app, "toggle", "开始 / 暂停", true, None::<&str>)?;
-    let lock = MenuItem::with_id(app, "lock", "锁定 / 解锁字幕窗", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-    let sep = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&show, &toggle, &lock, &sep, &quit])?;
     let mut tray = TrayIconBuilder::with_id("tray")
         .tooltip("F1 Radio")
-        .menu(&menu)
         .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| {
-            let shared = app.state::<Arc<Shared>>().inner().clone();
-            match event.id().as_ref() {
-                "show" => show_main(app, None),
-                "toggle" => engine::toggle(app.clone(), shared),
-                "lock" => set_locked(app, &shared, !shared.locked.load(Ordering::SeqCst)),
-                "quit" => {
-                    remember_overlay(app);
-                    let _ = shared.save();
-                    app.exit(0);
-                }
-                _ => {}
+        .on_tray_icon_event(|tray, event| match event {
+            TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } => {
+                show_main(tray.app_handle(), None)
             }
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                show_main(tray.app_handle(), None);
+            TrayIconEvent::Click { button: MouseButton::Right, button_state: MouseButtonState::Up, position, .. } => {
+                show_tray_menu(tray.app_handle(), position)
             }
+            _ => {}
         });
     if let Some(icon) = app.default_window_icon() {
         tray = tray.icon(icon.clone());
@@ -514,30 +476,24 @@ pub fn run() {
             let shared = Arc::new(Shared::new(Settings::load(&path), path));
             app.manage(shared.clone());
             let handle = app.handle().clone();
-            // Development aid: `F1RADIO_DRYRUN=1` prints the chosen monitor and exits before any window shows.
+            // Development aid: `F1RADIO_DRYRUN=1` prints where windows would open and exits before any shows.
             if cfg!(debug_assertions) && std::env::var("F1RADIO_DRYRUN").is_ok() {
-                let m = target_monitor(&handle, &shared);
-                eprintln!("[dryrun] target={:?}", m.map(|m| (m.name().cloned(), *m.position(), *m.size())));
+                let s = shared.settings.lock().unwrap();
+                eprintln!("[dryrun] main={:?} overlay={:?}", s.main_window, s.overlay);
                 std::process::exit(0);
+            }
+            // Windows are created only now, after the state exists, so no page can call a command too early.
+            for cfg in app.config().app.windows.clone() {
+                WebviewWindowBuilder::from_config(&handle, &cfg)?.build()?;
             }
             build_tray(&handle)?;
             register_shortcuts(&handle);
-            // Windows start hidden and appear only once they sit on the chosen monitor.
-            if let Some(m) = target_monitor(&handle, &shared) {
-                place_main(&handle, &m);
-            }
-            if let Some(w) = handle.get_webview_window("main") {
-                let _ = w.show();
-            }
+            // Windows start hidden and appear only once they are back where they were left.
+            place_main(&handle, &shared);
             place_overlay(&handle, &shared);
             if cfg!(debug_assertions) {
                 let pos = |l: &str| handle.get_webview_window(l).and_then(|w| w.outer_position().ok());
-                eprintln!(
-                    "[place] target={:?} main={:?} overlay={:?}",
-                    target_monitor(&handle, &shared).map(|m| (m.name().cloned(), *m.position())),
-                    pos("main"),
-                    pos("overlay")
-                );
+                eprintln!("[place] main={:?} overlay={:?}", pos("main"), pos("overlay"));
             }
             // Development aid: `F1RADIO_AUTOSTART=1` starts translating right after launch.
             if cfg!(debug_assertions) && std::env::var("F1RADIO_AUTOSTART").is_ok() {
@@ -560,7 +516,7 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| match (window.label(), event) {
-            ("overlay", WindowEvent::Moved(_) | WindowEvent::Resized(_)) => remember_overlay(window.app_handle()),
+            ("overlay" | "main", WindowEvent::Moved(_) | WindowEvent::Resized(_)) => remember_window(window.app_handle(), window.label()),
             ("main", WindowEvent::CloseRequested { .. }) => {
                 let app = window.app_handle();
                 remember_overlay(app);
@@ -582,8 +538,6 @@ pub fn run() {
             set_overlay_locked,
             set_overlay_visible,
             overlay_demo,
-            list_displays,
-            set_display,
             open_main,
             select_region,
             selector_ready,

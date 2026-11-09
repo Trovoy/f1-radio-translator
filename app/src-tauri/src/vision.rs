@@ -197,6 +197,27 @@ pub fn extract_cards(mut rows: Vec<OcrLine>) -> Vec<Card> {
     let trim = |s: &str| s.trim_matches(|c: char| " \t·•|:;,—–-.".contains(c)).to_string();
 
     rows.sort_by(|a, b| a.top.partial_cmp(&b.top).unwrap().then(a.left.partial_cmp(&b.left).unwrap()));
+
+    // MultiViewer chrome: the "AI radio transcriptions BETA" header and icon glyphs OCR reads as "o".
+    static CHROME: OnceLock<Regex> = OnceLock::new();
+    static LEAD: OnceLock<Regex> = OnceLock::new();
+    let chrome = CHROME.get_or_init(|| Regex::new(r"(?i)radio\s*transcri|^\W*beta\W*$").unwrap());
+    let lead = LEAD.get_or_init(|| Regex::new(r"^(?:[oO0©®•·|]\s+)+").unwrap());
+    // Card text sits in one column right of the avatar; the metadata rows show where it starts.
+    let column = rows
+        .iter()
+        .filter(|r| timestamp_re().is_match(&r.text) || ago.is_match(&r.text))
+        .map(|r| r.left)
+        .fold(f32::MAX, f32::min);
+    let rows: Vec<OcrLine> = rows
+        .into_iter()
+        .filter(|r| !chrome.is_match(&r.text))
+        // Card lines are left-aligned to that column; the avatar sits left of it, icons and tooltips far right.
+        .filter(|r| column == f32::MAX || (r.left >= column - 40.0 && r.left <= column + 120.0))
+        .map(|r| OcrLine { text: lead.replace(r.text.trim(), "").into_owned(), ..r })
+        .filter(|r| r.text.chars().filter(|c| c.is_alphabetic()).count() >= 3)
+        .collect();
+
     let mut cards = Vec::new();
     let mut current: Vec<String> = Vec::new();
     for row in rows {

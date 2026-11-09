@@ -19,9 +19,8 @@ npx tauri dev
 | `F1RADIO_DEMO=1` | 字幕窗自动播放几句示例字幕，便于调样式 |
 | `F1RADIO_AUTOSTART=1` | 启动 3 秒后自动开始翻译 |
 | `F1RADIO_SETTINGS=路径` | 改用指定的设置文件，测试时不碰真实设置 |
-| `F1RADIO_DRYRUN=1` | 只打印会使用哪块显示器，然后退出，不显示任何窗口 |
+| `F1RADIO_DRYRUN=1` | 只打印窗口会打开的位置，然后退出，不显示任何窗口 |
 
-显示器按左上角坐标记忆（`display_at`），名称只作备用：Windows 重启后可能把 DISPLAY1 和 DISPLAY2 对调。
 
 ## 打包
 
@@ -46,7 +45,8 @@ cargo test --lib -- --include-ignored
 | --- | --- |
 | `index.html` / `src/main.js` | 主窗口：概览、翻译服务、字幕样式、识别区域、快捷键 |
 | `overlay.html` / `src/overlay.js` | 透明字幕窗，悬停显示工具栏，可锁定为鼠标穿透 |
-| `selector.html` / `src/selector.js` | 全屏框选识别区域 |
+| `selector.html` / `src/selector.js` | 框选识别区域，每块显示器各开一个 |
+| `traymenu.html` / `src/traymenu.js` | 托盘右键菜单 |
 | `src/providers.js` | 24 家翻译服务的字段定义 |
 | `src-tauri/src/vision.rs` | GDI 截屏、Windows OCR、MultiViewer 卡片拆分 |
 | `src-tauri/src/translate.rs` | 四类翻译适配器和 F1 术语表 |

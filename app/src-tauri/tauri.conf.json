@@ -14,6 +14,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "F1 Radio",
         "url": "index.html",
         "width": 960,
@@ -27,6 +28,7 @@
       },
       {
         "label": "overlay",
+        "create": false,
         "title": "F1 Radio 字幕",
         "url": "overlay.html",
         "width": 980,
@@ -39,6 +41,21 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "focus": false,
+        "visible": false
+      },
+      {
+        "label": "traymenu",
+        "create": false,
+        "title": "F1 Radio 菜单",
+        "url": "traymenu.html",
+        "width": 252,
+        "height": 284,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
         "visible": false
       }
     ],

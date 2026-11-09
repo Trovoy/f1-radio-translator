@@ -19,7 +19,12 @@ body.hover:not(.locked) .ov::before { background: rgba(12, 12, 14, max(var(--pla
 .serif .ln .zh { font-family: var(--serif); }
 .ln .x { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .55s var(--ease), opacity .35s var(--ease); }
 .ln .x > div { overflow: hidden; min-height: 0; }
-.ln .who { font-size: calc(var(--sub) * .36); font-weight: 600; letter-spacing: .04em; color: var(--ink-2); text-shadow: 0 1px 3px rgba(0, 0, 0, .85); padding-bottom: 2px; }
+/* The speaker reads as a name tag, never as part of the sentence. */
+.ln .who { display: inline-flex; align-items: center; gap: .45em; margin-bottom: .45em; padding: .28em .75em .28em .6em; border-radius: 999px;
+  font-size: calc(var(--sub) * .34); font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: #fff; line-height: 1.2;
+  background: rgba(10, 10, 12, .62); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16); }
+.ln .who::before { content: ""; width: .5em; height: .5em; border-radius: 50%; background: var(--red); box-shadow: 0 0 .5em var(--red); flex: none; }
+.ln .x > div { padding: 2px 0; }
 .ln .en { font-size: calc(var(--sub) * .44); color: var(--ink-2); padding-top: 4px; text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
 .ln.old .zh { font-size: calc(var(--sub) * .6); color: rgba(244, 242, 238, .55); }
 .ln.old .x { grid-template-rows: 0fr; opacity: 0; }

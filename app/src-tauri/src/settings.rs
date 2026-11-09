@@ -54,11 +54,8 @@ pub struct Settings {
     pub context_lines: u32,
     pub auto_fallback: bool,
     pub overlay: Option<WindowRect>,
-    /// Monitor name (e.g. `\\.\DISPLAY1`) that every window opens on; `None` means the primary one.
-    /// Windows may renumber monitors after a reboot, so `display_at` is matched first.
-    pub display: Option<String>,
-    /// Top-left corner of the chosen monitor; stable across reboots unlike the name.
-    pub display_at: Option<(i32, i32)>,
+    /// Where the main window was last left.
+    pub main_window: Option<WindowRect>,
 }
 
 impl Default for Settings {
@@ -73,8 +70,7 @@ impl Default for Settings {
             context_lines: 2,
             auto_fallback: true,
             overlay: None,
-            display: None,
-            display_at: None,
+            main_window: None,
         }
     }
 }

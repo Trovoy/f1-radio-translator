@@ -13,6 +13,7 @@ export default defineConfig({
         main: resolve(import.meta.dirname, "index.html"),
         overlay: resolve(import.meta.dirname, "overlay.html"),
         selector: resolve(import.meta.dirname, "selector.html"),
+        traymenu: resolve(import.meta.dirname, "traymenu.html"),
       },
     },
   },

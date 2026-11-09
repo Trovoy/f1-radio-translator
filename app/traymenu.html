@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>F1 Radio 菜单</title>
+  <link rel="stylesheet" href="/src/traymenu.css">
+</head>
+<body>
+  <div class="menu" id="menu" role="menu">
+    <div class="head"><span class="mk" id="mk"></span><span class="wordmark">F1 Radio</span><span class="st"><i class="dot" id="dot"></i><span id="stText">未开始</span></span></div>
+    <button role="menuitem" data-act="toggle"><svg id="playIc" viewBox="0 0 16 16" fill="currentColor"></svg><span id="toggleText">开始翻译</span><kbd>Ctrl Alt F9</kbd></button>
+    <button role="menuitem" data-act="stop" id="stopBtn"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg><span>结束</span><kbd>Ctrl Alt F10</kbd></button>
+    <div class="sep"></div>
+    <button role="menuitem" data-act="lock"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3.5" y="7" width="9" height="6.5" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg><span id="lockText">锁定字幕窗</span><kbd>Ctrl Alt L</kbd></button>
+    <button role="menuitem" data-act="overlay"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1.75" y="3" width="12.5" height="10" rx="2"/><path d="M4.5 10h7"/></svg><span id="ovText">隐藏字幕窗</span><kbd>Ctrl Alt H</kbd></button>
+    <button role="menuitem" data-act="main"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M2.5 5h7M12.5 5h1M2.5 11h1M6.5 11h7"/><circle cx="11" cy="5" r="1.5"/><circle cx="5" cy="11" r="1.5"/></svg><span>打开主窗口</span></button>
+    <div class="sep"></div>
+    <button role="menuitem" data-act="quit" class="quit"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2.5v5M4.6 4.8a5 5 0 1 0 6.8 0"/></svg><span>退出</span></button>
+  </div>
+  <script type="module" src="/src/traymenu.js"></script>
+</body>
+</html>

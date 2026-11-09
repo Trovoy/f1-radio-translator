@@ -34,7 +34,8 @@ recharge = 回收能量
 const SYSTEM: &str = "You translate live Formula 1 team-radio transcript lines into concise, natural Simplified Chinese. \
 Keep the spoken tone. Preserve driver names, team names, car numbers, lap and turn numbers, decimals and units exactly. \
 The input may contain speech-recognition errors or an unfinished sentence: use the F1 context, correct an error only when it is obvious, \
-never invent facts, and return only the Chinese translation with no notes.";
+never invent facts, and return only the Chinese translation with no notes. \
+Keep every driver, team and person name in English exactly as written (for example Bearman, Leclerc, Lindblad); never transliterate names into Chinese.";
 
 pub fn client() -> Client {
     Client::builder()
@@ -132,6 +133,9 @@ fn post_edit(en: &str, zh: String) -> String {
     if lower.contains("track limits") {
         out = out.replace("轨道限制", "赛道界限").replace("赛道限制", "赛道界限");
     }
+    if has("pit") || has("pitting") || has("pits") {
+        out = out.replace("点蚀", "进站").replace("凹坑", "进站");
+    }
     if lower.contains("double yellow") {
         out = out.replace("双黄色", "双黄旗");
     }
@@ -159,10 +163,48 @@ fn default_model(id: &str) -> Option<&'static str> {
     })
 }
 
+/// Driver names stay in English. Surnames always; first names are matched case-sensitively.
+const NAMES: &[&str] = &[
+    "Verstappen", "Hadjar", "Leclerc", "Hamilton", "Russell", "Antonelli", "Norris", "Piastri", "Alonso", "Stroll",
+    "Gasly", "Colapinto", "Ocon", "Bearman", "Hulkenberg", "Hülkenberg", "Bortoleto", "Lawson", "Lindblad", "Albon",
+    "Sainz", "Perez", "Pérez", "Bottas", "Tsunoda", "Doohan", "Max", "Isack", "Charles", "Lewis", "George", "Kimi",
+    "Lando", "Oscar", "Fernando", "Lance", "Pierre", "Franco", "Esteban", "Oliver", "Nico", "Gabriel", "Liam", "Arvid",
+    "Carlos", "Sergio", "Valtteri", "Yuki", "Jack",
+];
+
+/// Machine translation transliterates names (Bearman → 贝尔曼). Swap them for tokens it leaves alone.
+pub fn protect_names(text: &str) -> (String, Vec<String>) {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(&format!(r"\b(?:{})\b", NAMES.join("|"))).unwrap());
+    let mut found = Vec::new();
+    let out = re
+        .replace_all(text, |c: &regex::Captures| {
+            found.push(c[0].to_string());
+            format!("XN{}Z", found.len() - 1)
+        })
+        .into_owned();
+    (out, found)
+}
+
+pub fn restore_names(zh: &str, names: &[String]) -> String {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(r"(?i)X\s*N\s*(\d+)\s*Z").unwrap());
+    static SPACE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let space = SPACE.get_or_init(|| regex::Regex::new(r"\s+([，。！？、；：])").unwrap());
+    let out = re.replace_all(zh, |c: &regex::Captures| {
+        c[1].parse::<usize>().ok().and_then(|i| names.get(i)).cloned().unwrap_or_default()
+    });
+    space.replace_all(&out, "$1").into_owned()
+}
+
 pub async fn translate(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Result<String, String> {
     let is_mt = matches!(id, "deepl" | "google" | "azure" | "baidu" | "youdao" | "tencent" | "aliyun" | "volc" | "mymemory" | "libre" | "deeplx");
-    let zh = route(c, id, cfg, job).await?;
-    Ok(if is_mt { post_edit(job.text, zh) } else { zh })
+    if !is_mt {
+        return route(c, id, cfg, job).await;
+    }
+    let (text, names) = protect_names(job.text);
+    let zh = route(c, id, cfg, &Job { text: &text, context: job.context, glossary: job.glossary }).await?;
+    Ok(post_edit(job.text, restore_names(&zh, &names)))
 }
 
 async fn route(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Result<String, String> {

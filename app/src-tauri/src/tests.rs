@@ -67,3 +67,64 @@ fn a_growing_card_keeps_its_id() {
     remember(&mut recent, "Race Engineer", "Skipped on the first pass", 0);
     assert_eq!(grown_from(&recent, "Race Engineer", "Skipped on the first pass, more"), None, "first-pass cards are not reused");
 }
+
+/// Runs OCR + card splitting on a capture given by `F1RADIO_OCR_FILE` (raw `[w][h]BGRA`).
+#[test]
+#[ignore = "needs F1RADIO_OCR_FILE"]
+fn ocr_dump_file() {
+    #[cfg(windows)]
+    unsafe {
+        let _ = windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_MULTITHREADED);
+    }
+    let bytes = std::fs::read(std::env::var("F1RADIO_OCR_FILE").unwrap()).unwrap();
+    let w = i32::from_le_bytes(bytes[0..4].try_into().unwrap());
+    let h = i32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    let mut px = bytes[8..].to_vec();
+    for p in px.chunks_exact_mut(4) {
+        p[3] = 255;
+    }
+    let rows = Ocr::new().unwrap().recognize(&Frame { w, h, bgra: px }.upscale2()).unwrap();
+    for r in &rows {
+        println!("ROW {:>6.1} {:>6.1}  {}", r.top, r.left, r.text);
+    }
+    for c in vision::extract_cards(rows) {
+        println!("CARD [{}] {}", c.speaker, c.text);
+    }
+}
+
+#[test]
+fn real_multiviewer_capture_drops_the_header() {
+    #[cfg(windows)]
+    unsafe {
+        let _ = windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_MULTITHREADED);
+    }
+    let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/mv_real.bgra")).unwrap();
+    let w = i32::from_le_bytes(bytes[0..4].try_into().unwrap());
+    let h = i32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    let mut px = bytes[8..].to_vec();
+    for p in px.chunks_exact_mut(4) {
+        p[3] = 255;
+    }
+    let rows = Ocr::new().unwrap().recognize(&Frame { w, h, bgra: px }.upscale2()).unwrap();
+    let cards = vision::extract_cards(rows);
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].speaker, "Arvid Lindblad");
+    assert!(cards[0].text.starts_with("Okay, we'll manage Arvid"), "{}", cards[0].text);
+    assert!(!cards[0].text.to_lowercase().contains("transcription"));
+}
+
+#[test]
+fn names_round_trip_through_tokens() {
+    let (t, names) = translate::protect_names("Bearman, three reds. [unclear] Leclerc. Max power.");
+    assert_eq!(t, "XN0Z, three reds. [unclear] XN1Z. XN2Z power.");
+    assert_eq!(translate::restore_names("XN0Z，三个红色。[听不清] X N1 Z。", &names), "Bearman，三个红色。[听不清] Leclerc。");
+}
+
+#[tokio::test]
+#[ignore = "uses the network"]
+async fn mymemory_keeps_driver_names() {
+    let job = Job { text: "Bearman, next target, three reds. Leclerc is pitting.", context: &[], glossary: GLOSSARY };
+    let zh = translate::translate(&translate::client(), "mymemory", &HashMap::new(), &job).await.expect("translation");
+    println!("{zh}");
+    assert!(zh.contains("Bearman") && zh.contains("Leclerc"), "{zh}");
+}

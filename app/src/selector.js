@@ -32,8 +32,16 @@ document.addEventListener("pointerdown", (e) => {
   document.setPointerCapture?.(e.pointerId);
 });
 
+// The hint bar never covers what you are framing: it drops to the bottom edge when the
+// pointer nears the top, and fades out while a box is being drawn or moved.
+const bar = $("#bar");
+document.addEventListener("pointermove", (e) => {
+  if (!drag) bar.classList.toggle("low", e.clientY < 140);
+});
+
 document.addEventListener("pointermove", (e) => {
   if (!drag) return;
+  document.body.classList.add("dragging");
   const { start } = drag, dx = e.clientX - start.x, dy = e.clientY - start.y;
   if (drag.mode === "draw") {
     rect = { x: Math.min(start.x, e.clientX), y: Math.min(start.y, e.clientY), w: Math.abs(dx), h: Math.abs(dy) };
@@ -53,6 +61,7 @@ document.addEventListener("pointermove", (e) => {
 document.addEventListener("pointerup", () => {
   if (drag?.mode === "draw" && rect && (rect.w < 4 || rect.h < 4)) rect = drag.start.r ?? null;
   drag = null;
+  document.body.classList.remove("dragging");
   render();
 });
 
