@@ -296,10 +296,15 @@ async fn openai_compat(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Res
         ("", Some(m)) => m,
         _ => need(cfg, "model", "模型")?,
     };
+    let mut system = chat_system(job);
+    // Qwen3-style models think out loud by default; a live subtitle cannot wait for that.
+    if model.to_ascii_lowercase().contains("qwen3") {
+        system.push_str("\n/no_think");
+    }
     let mut body = json!({
         "model": model,
         "messages": [
-            { "role": "system", "content": chat_system(job) },
+            { "role": "system", "content": system },
             { "role": "user", "content": job.text }
         ],
         "temperature": 0.2,
@@ -310,12 +315,28 @@ async fn openai_compat(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Res
     } else {
         body["max_tokens"] = json!(240);
     }
+    if id == "ollama" {
+        // Keep the model in VRAM for a whole session instead of Ollama's default five minutes.
+        body["keep_alive"] = json!("30m");
+        body["think"] = json!(false);
+    }
     let mut req = c.post(url).json(&body);
+    if local {
+        // The first call loads the model into VRAM, which can take well over the usual 20 s.
+        req = req.timeout(Duration::from_secs(90));
+    }
     if !key.is_empty() {
         req = req.bearer_auth(key);
     }
     let v = send(req).await?;
-    pick(&v, "/choices/0/message/content")
+    Ok(strip_thinking(&pick(&v, "/choices/0/message/content")?))
+}
+
+/// Drops a `<think>…</think>` block some local models still emit before the answer.
+pub fn strip_thinking(s: &str) -> String {
+    static RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = RE.get_or_init(|| regex::Regex::new(r"(?s)<think>.*?</think>|^.*?</think>").unwrap());
+    re.replace_all(s, "").trim().to_string()
 }
 
 async fn anthropic(c: &Client, cfg: &Fields, job: &Job<'_>) -> Result<String, String> {

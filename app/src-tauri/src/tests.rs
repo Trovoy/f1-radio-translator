@@ -198,3 +198,10 @@ fn speaker_names_snap_to_the_grid() {
     assert_eq!(vision::canonical_speaker("Race Engineer"), "Race Engineer", "not a driver: kept as read");
     assert_eq!(vision::canonical_speaker("Hamllton"), "Lewis Hamilton");
 }
+
+#[test]
+fn thinking_blocks_are_removed() {
+    assert_eq!(translate::strip_thinking("<think>\nThe user wants...\n</think>\n\n这圈进站。"), "这圈进站。");
+    assert_eq!(translate::strip_thinking("reasoning without an opening tag</think>收到。"), "收到。");
+    assert_eq!(translate::strip_thinking("收到，Checo。"), "收到，Checo。");
+}
