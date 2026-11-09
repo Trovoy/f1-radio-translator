@@ -26,11 +26,14 @@ body { font-family: var(--sans); font-size: var(--fs-base); line-height: 1.5; }
 .nav button:hover, .nav button[aria-current="true"] { color: var(--ink); }
 .nav button .ic { opacity: .72; transition: opacity .25s; }
 .nav button:hover .ic, .nav button[aria-current="true"] .ic { opacity: 1; }
-.nav .lb, .app .wordmark, .mini-st span, .mini-st b, .side-foot .ver { transition: opacity .3s var(--ease); }
+/* Labels wait for the rail to finish widening before they fade in, and leave before it narrows,
+   so no half-clipped, half-faded text is ever on screen. */
+.nav .lb, .app .wordmark, .mini-st span, .mini-st b, .side-foot .ver { transition: opacity .22s var(--ease) .3s, transform .3s var(--ease) .3s; }
 
 /* Collapsed: an icon rail. Icons keep their x position, so only the labels fade. */
-.win.mini { --side: 68px; }
-.win.mini .nav .lb, .win.mini .app .wordmark, .win.mini .mini-st span, .win.mini .mini-st b, .win.mini .side-foot .ver { opacity: 0; pointer-events: none; }
+.win.mini { --side: 68px; transition-delay: .08s; }
+.nav .lb { display: inline-block; }
+.win.mini .nav .lb, .win.mini .app .wordmark, .win.mini .mini-st span, .win.mini .mini-st b, .win.mini .side-foot .ver { opacity: 0; transform: translateX(-6px); pointer-events: none; transition: opacity .1s linear, transform .1s linear; }
 /* The rail has no status box: the logo's red dot carries the on-air state instead. */
 .win.mini .mini-st { height: 0; opacity: 0; margin: 0; pointer-events: none; }
 .live-on .app-mk path.r { stroke-dashoffset: 0; animation: pulse 2s ease-in-out infinite; filter: drop-shadow(0 0 3px rgba(255, 77, 61, .9)); }
