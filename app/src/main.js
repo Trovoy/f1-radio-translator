@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { $, $$, ICON, escapeHtml, invoke, listen, mark, speakerLabel } from "./shared.js";
+import { $, $$, ICON, escapeHtml, invoke, listen, mark, spaceMixed, speakerLabel, teamColor } from "./shared.js";
 import { CATEGORIES, PROVIDER, PROVIDERS, fieldsFor, isConfigured, providerName } from "./providers.js";
 
 const win = getCurrentWindow();
@@ -219,7 +219,7 @@ function addRecent(l) {
   ul.querySelector(".none")?.remove();
   const li = document.createElement("li");
   li.className = "in";
-  li.innerHTML = `<div class="m">${escapeHtml(speakerLabel(l.speaker))}</div><div class="z">${escapeHtml(l.zh)}</div>`;
+  li.innerHTML = `<div class="m" style="--team:${teamColor(l.speaker)}">${escapeHtml(speakerLabel(l.speaker))}</div><div class="z">${escapeHtml(spaceMixed(l.zh))}</div>`;
   ul.prepend(li);
   [...ul.children].slice(3).forEach((x) => x.remove());
 }

@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { $, ICON, escapeHtml, invoke, listen, speakerLabel } from "./shared.js";
+import { $, ICON, escapeHtml, invoke, listen, spaceMixed, speakerLabel, teamColor } from "./shared.js";
 import { providerName } from "./providers.js";
 
 const win = getCurrentWindow();
@@ -46,8 +46,8 @@ $("#en").onclick = () => saveStyle({ show_en: !style.show_en });
 function lineEl(m, enter) {
   const d = document.createElement("div");
   d.className = "ln" + (enter && !RM ? " enter" : "") + (m.hint ? " hint" : "");
-  d.innerHTML = `<div class="x"><div><div class="who">${escapeHtml(m.who)}</div></div></div>`
-    + `<div class="zh">${m.pending ? '<span class="wait"><i></i><i></i><i></i></span>' : `<span>${escapeHtml(m.zh)}</span>`}</div>`
+  d.innerHTML = `<div class="x"><div><div class="who" style="--team:${teamColor(m.who)}">${escapeHtml(m.who)}</div></div></div>`
+    + `<div class="zh">${m.pending ? '<span class="wait"><i></i><i></i><i></i></span>' : `<span>${escapeHtml(spaceMixed(m.zh))}</span>`}</div>`
     + `<div class="x e"><div><div class="en">${escapeHtml(m.en ?? "")}</div></div></div>`;
   return d;
 }
@@ -67,7 +67,7 @@ function push(m) {
 
 function resolve(el, zh, failed) {
   el.classList.toggle("failed", !!failed);
-  el.querySelector(".zh").innerHTML = `<span class="got">${escapeHtml(zh)}</span>`;
+  el.querySelector(".zh").innerHTML = `<span class="got">${escapeHtml(spaceMixed(zh))}</span>`;
 }
 
 listen("radio-line", ({ payload }) => {

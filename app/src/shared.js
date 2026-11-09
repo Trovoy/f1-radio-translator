@@ -28,6 +28,34 @@ export const ICON = {
 
 export const speakerLabel = (s) => (s && s.trim() ? s.trim() : "无线电");
 
+/** 2026 grid: surname → team colour, used for the speaker's name tag. */
+const TEAM = {
+  "#3671C6": ["verstappen", "hadjar"],
+  "#E8002D": ["leclerc", "hamilton"],
+  "#27F4D2": ["russell", "antonelli"],
+  "#FF8000": ["norris", "piastri"],
+  "#229971": ["alonso", "stroll"],
+  "#0093CC": ["gasly", "colapinto"],
+  "#B6BABD": ["ocon", "bearman"],
+  "#6692FF": ["lawson", "lindblad"],
+  "#64C4FF": ["albon", "sainz"],
+  "#F50537": ["hulkenberg", "hülkenberg", "bortoleto"],
+  "#E8E8E8": ["perez", "pérez", "bottas"],
+};
+const TEAM_OF = Object.fromEntries(Object.entries(TEAM).flatMap(([c, names]) => names.map((n) => [n, c])));
+export function teamColor(speaker) {
+  const words = String(speaker ?? "").toLowerCase().split(/\s+/);
+  for (const w of words.reverse()) if (TEAM_OF[w]) return TEAM_OF[w];
+  return "rgba(244, 242, 238, .55)";
+}
+
+/** Puts a space between Latin and Chinese text: "Hamilton信息" → "Hamilton 信息". */
+export function spaceMixed(s) {
+  return String(s ?? "")
+    .replace(/([A-Za-z0-9\]\)])([一-鿿])/g, "$1 $2")
+    .replace(/([一-鿿])([A-Za-z0-9\[\(])/g, "$1 $2");
+}
+
 export function escapeHtml(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
