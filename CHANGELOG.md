@@ -2,6 +2,10 @@
 
 # Changelog
 
+## 2.0.2
+
+- Visual alignment pass: one left edge per page, 56px rows, 34px controls, equal-width controls in each group, aligned shortcut keys, the on-air dot hung in the margin, sidebar status and tray menu aligned to the icon and label columns.
+
 ## 2.0.1
 
 - Choose where local models are stored (for example on drive D); the engine and models already downloaded are moved there, with progress across drives.

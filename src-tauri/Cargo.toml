@@ -1,6 +1,6 @@
 [package]
 name = "f1-radio-translator"
-version = "2.0.1"
+version = "2.0.2"
 description = "Live Chinese subtitles for F1 team radio transcripts"
 edition = "2021"
 license = "MIT"

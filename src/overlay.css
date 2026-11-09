@@ -54,7 +54,7 @@ body.hover:not(.locked) .ov::before { background: rgba(12, 12, 14, max(var(--pla
   transition: opacity .25s var(--ease), transform .35s var(--spring); }
 body.hover:not(.locked) .tb { opacity: 1; pointer-events: auto; transform: none; }
 .tb .grip { width: 22px; height: 30px; display: grid; place-items: center; color: var(--ink-3); cursor: grab; }
-.tb .grip svg, .tb svg { width: 14px; height: 14px; }
+.tb .grip svg, .tb svg { width: 14px; height: 14px; stroke-linecap: round; stroke-linejoin: round; }
 .tb button { height: 30px; min-width: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--ink-2);
   display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-sm); transition: background .2s, color .2s; }
 .tb button:hover { background: var(--fill-2); color: var(--ink); }
