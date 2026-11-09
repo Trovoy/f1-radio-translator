@@ -69,6 +69,21 @@ function go(p) {
   page = p;
 }
 $("#nav").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) go(b.dataset.p); });
+
+// ── collapsible sidebar (remembered on this computer) ──
+const winEl = $("#win");
+function setMini(on, animate = true) {
+  if (!animate) winEl.classList.add("no-anim");
+  winEl.classList.toggle("mini", on);
+  const label = on ? "展开侧栏" : "收起侧栏";
+  $("#sideTg").title = label; $("#sideTg").setAttribute("aria-label", label);
+  try { localStorage.setItem("side-mini", on ? "1" : "0"); } catch {}
+  if (!animate) requestAnimationFrame(() => requestAnimationFrame(() => winEl.classList.remove("no-anim")));
+}
+try { if (localStorage.getItem("side-mini") === "1") setMini(true, false); } catch {}
+$("#sideTg").onclick = () => setMini(!winEl.classList.contains("mini"));
+// The active-page highlight follows the buttons as the rail widens or narrows.
+new ResizeObserver(placeInd).observe($("#nav"));
 listen("navigate", ({ payload }) => go(payload));
 
 // ── segmented controls ──
