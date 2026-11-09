@@ -6,16 +6,15 @@
   <link rel="stylesheet" href="/src/selector.css">
 </head>
 <body>
-  <div class="bar" id="bar">
-    <span class="t">在任意一块屏幕上拖动，框住 MultiViewer 的转录卡片（含姓名行）</span>
-    <span class="k"><kbd>Enter</kbd> 确认 · <kbd>Esc</kbd> 取消 · 方向键微调</span>
-    <button id="cancel">取消</button>
-    <button id="ok" class="pri" disabled>确认区域</button>
-  </div>
+  <div class="hint" id="hint">在任意一块屏幕上拖动，框住 MultiViewer 的转录卡片（含姓名行）<span><kbd>Esc</kbd> 取消</span></div>
   <div class="sel" id="sel" hidden>
     <span class="size" id="size"></span>
     <i data-h="nw"></i><i data-h="n"></i><i data-h="ne"></i><i data-h="e"></i>
     <i data-h="se"></i><i data-h="s"></i><i data-h="sw"></i><i data-h="w"></i>
+  </div>
+  <div class="tools" id="tools" hidden>
+    <button id="cancel" title="取消（Esc）" aria-label="取消"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+    <button id="ok" class="pri" title="确认（Enter）"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>确认</button>
   </div>
   <script type="module" src="/src/selector.js"></script>
 </body>

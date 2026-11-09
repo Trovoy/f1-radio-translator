@@ -1,22 +1,37 @@
 import { $, invoke } from "./shared.js";
 
 const sel = $("#sel");
-// The hint bar stays put while the pointer moves (so its buttons can be clicked); it only
-// sits at the bottom when the box itself is near the top, and fades out while drawing.
-const bar = $("#bar");
+const tools = $("#tools");
 const MIN_W = 50, MIN_H = 20;
 let rect = null; // CSS pixels within this window
 let drag = null;
+let origin = { x: 0, y: 0 }; // this monitor's top-left in physical pixels, for the label
 
 function render() {
-  bar.classList.toggle("low", !!rect && rect.y < 120);
-  if (!rect) { sel.hidden = true; document.body.classList.remove("has-sel"); $("#ok").disabled = true; return; }
+  if (!rect) {
+    sel.hidden = true; tools.hidden = true;
+    document.body.classList.remove("has-sel");
+    return;
+  }
   Object.assign(sel.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
   sel.hidden = false;
   document.body.classList.add("has-sel");
   const s = devicePixelRatio;
-  $("#size").textContent = `${Math.round(rect.w * s)} × ${Math.round(rect.h * s)}`;
+  $("#size").textContent = `${Math.round(origin.x + rect.x * s)}, ${Math.round(origin.y + rect.y * s)}  ·  ${Math.round(rect.w * s)} × ${Math.round(rect.h * s)} px`;
+  sel.classList.toggle("label-in", rect.y < 34);
   $("#ok").disabled = rect.w < MIN_W || rect.h < MIN_H;
+  placeTools();
+}
+
+/** Bottom-right corner, outside the box; flips above it near the bottom edge, inside if neither fits. */
+function placeTools() {
+  tools.hidden = false;
+  const tw = tools.offsetWidth, th = tools.offsetHeight, gap = 8;
+  let top = rect.y + rect.h + gap;
+  if (top + th > innerHeight - gap) top = rect.y - th - gap;
+  if (top < gap) top = rect.y + rect.h - th - gap;
+  const left = Math.max(gap, Math.min(rect.x + rect.w - tw, innerWidth - tw - gap));
+  Object.assign(tools.style, { left: `${left}px`, top: `${top}px` });
 }
 
 function clamp(r) {
@@ -27,13 +42,12 @@ function clamp(r) {
 }
 
 document.addEventListener("pointerdown", (e) => {
-  if (e.button !== 0 || e.target.closest(".bar")) return;
+  if (e.button !== 0 || e.target.closest(".tools")) return;
   const handle = e.target.dataset?.h;
   const start = { x: e.clientX, y: e.clientY, r: rect && { ...rect } };
   if (handle) drag = { mode: handle, start };
   else if (e.target.closest(".sel")) drag = { mode: "move", start };
   else { drag = { mode: "draw", start }; rect = { x: e.clientX, y: e.clientY, w: 0, h: 0 }; }
-  document.setPointerCapture?.(e.pointerId);
 });
 
 document.addEventListener("pointermove", (e) => {
@@ -62,6 +76,9 @@ document.addEventListener("pointerup", () => {
   render();
 });
 
+// Double-clicking inside the box confirms, as in most screenshot tools.
+sel.addEventListener("dblclick", () => finish());
+
 const finish = () => { if (rect && rect.w >= MIN_W && rect.h >= MIN_H) invoke("finish_region", { rect }); };
 const cancel = () => invoke("cancel_region");
 $("#ok").onclick = finish;
@@ -76,7 +93,8 @@ document.addEventListener("keydown", (e) => {
   if (move) { e.preventDefault(); rect = clamp({ ...rect, x: rect.x + move[0], y: rect.y + move[1] }); render(); }
 });
 
-invoke("selector_info").then(({ region }) => {
+invoke("selector_info").then(({ region, origin: o }) => {
+  if (o) origin = o;
   if (region && region.w > 0) { rect = clamp({ ...region }); render(); }
 });
 // Tell the backend the page is painted; only then does it hide the other windows.

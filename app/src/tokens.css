@@ -23,6 +23,8 @@
 }
 
 * { box-sizing: border-box; }
+/* `hidden` must win over component display rules (e.g. a flex toolbar). */
+[hidden] { display: none !important; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 1.5px solid var(--ink); outline-offset: 2px; border-radius: 6px; }

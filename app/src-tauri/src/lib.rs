@@ -228,8 +228,16 @@ fn selector_ready(app: AppHandle) {
 }
 
 #[derive(Serialize)]
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+#[derive(Serialize)]
 struct SelectorInfo {
     region: Option<Region>,
+    /// This monitor's top-left in physical pixels, so the page can label absolute coordinates.
+    origin: Option<Point>,
 }
 
 /// The saved region in the calling selector's own CSS pixels, if it lies on that monitor.
@@ -237,7 +245,7 @@ struct SelectorInfo {
 fn selector_info(window: tauri::WebviewWindow, shared: S) -> SelectorInfo {
     let region = shared.settings.lock().unwrap().region;
     let (Ok(origin), Ok(size), Ok(scale)) = (window.inner_position(), window.inner_size(), window.scale_factor()) else {
-        return SelectorInfo { region: None };
+        return SelectorInfo { region: None, origin: None };
     };
     let region = region
         .filter(|r| {
@@ -250,7 +258,7 @@ fn selector_info(window: tauri::WebviewWindow, shared: S) -> SelectorInfo {
             w: (r.w as f64 / scale).round() as i32,
             h: (r.h as f64 / scale).round() as i32,
         });
-    SelectorInfo { region }
+    SelectorInfo { region, origin: Some(Point { x: origin.x, y: origin.y }) }
 }
 
 fn close_selector(app: &AppHandle) {

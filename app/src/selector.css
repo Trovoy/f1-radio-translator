@@ -4,10 +4,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; user-select: none; }
 body { font-family: var(--sans); color: var(--ink); cursor: crosshair; background: rgba(0, 0, 0, .42); }
 body.has-sel { background: transparent; }
 
-.sel { position: fixed; border-radius: 4px; box-shadow: 0 0 0 1.5px var(--ink), 0 0 0 9999px rgba(0, 0, 0, .42); cursor: move; }
-.sel .size { position: absolute; left: 0; top: -30px; padding: 3px 9px; border-radius: 6px; font-size: 12px; font-variant-numeric: tabular-nums;
-  background: rgba(20, 20, 22, .92); box-shadow: inset 0 0 0 1px var(--line-2); white-space: nowrap; }
-.sel i { position: absolute; width: 10px; height: 10px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px rgba(0, 0, 0, .5); }
+.sel { position: fixed; border-radius: 2px; box-shadow: 0 0 0 1.5px var(--ink), 0 0 0 9999px rgba(0, 0, 0, .42); cursor: move; }
+.sel i { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px rgba(0, 0, 0, .55); }
 .sel i[data-h="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
 .sel i[data-h="n"] { left: calc(50% - 5px); top: -5px; cursor: ns-resize; }
 .sel i[data-h="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
@@ -17,15 +15,29 @@ body.has-sel { background: transparent; }
 .sel i[data-h="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
 .sel i[data-h="w"] { left: -5px; top: calc(50% - 5px); cursor: ew-resize; }
 
-.bar { position: fixed; left: 0; right: 0; top: 18px; margin: 0 auto; width: max-content; max-width: calc(100% - 32px); z-index: 2; cursor: default;
-  display: flex; align-items: center; gap: 14px; padding: 8px 8px 8px 16px; border-radius: 12px; font-size: 13px;
-  background: rgba(22, 22, 25, .94); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 16px 40px -12px rgba(0, 0, 0, .8);
-  animation: drop .45s var(--spring) both; transition: top .35s var(--ease), opacity .2s var(--ease); }
-.bar.low { top: calc(100% - 70px); }
-body.dragging .bar { opacity: 0; pointer-events: none; }
-@keyframes drop { from { opacity: 0; transform: translateY(-10px); } }
-.bar .k { color: var(--ink-3); font-size: 12px; }
+/* Size label hugs the box's top-left corner, like a screenshot tool. */
+.sel .size { position: absolute; left: -1px; bottom: calc(100% + 7px); padding: 3px 8px; border-radius: 5px; white-space: pre;
+  font-size: 12px; font-variant-numeric: tabular-nums; background: rgba(18, 18, 20, .9); box-shadow: inset 0 0 0 1px var(--line-2); pointer-events: none; }
+.sel.label-in .size { bottom: auto; top: 6px; left: 6px; }
+
+/* Actions hug the box's bottom-right corner and follow it. */
+.tools { position: fixed; display: flex; gap: 4px; padding: 4px; border-radius: 9px; cursor: default; z-index: 3;
+  background: rgba(24, 24, 27, .96); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 10px 26px -8px rgba(0, 0, 0, .8);
+  animation: tools-in .2s var(--ease) both; }
+@keyframes tools-in { from { opacity: 0; transform: translateY(-3px); } }
+.tools button { height: 30px; min-width: 30px; padding: 0 9px; border: 0; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12.5px; background: none; color: var(--ink-2); transition: background .15s, color .15s; }
+.tools button:hover { background: var(--fill-2); color: var(--ink); }
+.tools button.pri { background: var(--ink); color: #141416; font-weight: 600; }
+.tools button.pri:hover { background: #fff; }
+.tools button:disabled { opacity: .4; pointer-events: none; }
+.tools svg { width: 14px; height: 14px; }
+body.dragging .tools { display: none; }
+
+/* A one-line instruction, shown only before anything is drawn. */
+.hint { position: fixed; left: 0; right: 0; top: 22px; margin: 0 auto; width: max-content; max-width: calc(100% - 32px); display: flex; gap: 14px; align-items: center;
+  padding: 8px 14px; border-radius: 9px; font-size: 13px; background: rgba(22, 22, 25, .9); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+  pointer-events: none; transition: opacity .2s var(--ease); }
+.hint span { color: var(--ink-3); font-size: 12px; }
+body.has-sel .hint { opacity: 0; }
 kbd { font-family: ui-monospace, Consolas, monospace; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, .08); color: var(--ink-2); }
-.bar button { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; font-size: 13px; background: var(--fill-2); color: var(--ink); }
-.bar button.pri { background: var(--ink); color: #141416; }
-.bar button:disabled { opacity: .4; cursor: default; }
