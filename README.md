@@ -25,7 +25,7 @@ Version 2.0 is a full rewrite in Tauri 2 and Rust. It no longer needs Python, an
 
 ## Quick start
 
-1. Download and run `F1 Radio_2.0.0_x64-setup.exe` from [Releases](https://github.com/Trovoy/f1-radio-translator/releases).
+1. Download and run `F1-Radio_2.0.0_x64-setup.exe` from [Releases](https://github.com/Trovoy/f1-radio-translator/releases).
 2. In MultiViewer, open **AI Radio Transcriptions**.
 3. In the app, open **识别区域** (capture region) and draw a box around the transcript cards.
 4. Under **翻译服务** (translation services), configure a service. MyMemory works without a key. To translate offline, open **本地与自建 → 本地模型（显卡）** (local and self-hosted → local model), download a model, click **使用此模型** (use this model), then **设为主用** (set as primary).

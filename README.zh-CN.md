@@ -25,7 +25,7 @@
 
 ## 快速开始
 
-1. 在 [Releases](https://github.com/Trovoy/f1-radio-translator/releases) 下载 `F1 Radio_2.0.0_x64-setup.exe` 并安装。
+1. 在 [Releases](https://github.com/Trovoy/f1-radio-translator/releases) 下载 `F1-Radio_2.0.0_x64-setup.exe` 并安装。
 2. 在 MultiViewer 里打开 **AI Radio Transcriptions**。
 3. 在软件里进入 **识别区域**，框住转录卡片。
 4. 在 **翻译服务** 里配置一家服务（MyMemory 不需要密钥）。想离线翻译：进入 **本地与自建 → 本地模型（显卡）**，下载模型，点 **使用此模型**，再点 **设为主用**。
