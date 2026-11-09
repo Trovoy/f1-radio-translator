@@ -20,7 +20,7 @@
         "height": 620,
         "minWidth": 820,
         "minHeight": 540,
-        "center": true,
+        "visible": false,
         "decorations": false,
         "shadow": true,
         "backgroundColor": "#18181b"

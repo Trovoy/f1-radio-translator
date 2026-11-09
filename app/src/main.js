@@ -13,15 +13,30 @@ const lines = new Map(); // id -> { speaker, text, zh, ms, pending }
 let queue = 0;
 
 $("#appMark").innerHTML = mark({ draw: true });
-$("#wMin").onclick = () => win.minimize();
-$("#wClose").onclick = () => invoke("quit");
-
 // ── saving (debounced so typing a key does not write on every keystroke) ──
-let saveTimer;
+let saveTimer = null;
+let lastSent = "";
+// Key-sorted JSON: the backend's maps come back in arbitrary key order.
+const canon = (v) => Array.isArray(v) ? `[${v.map(canon).join(",")}]`
+  : v && typeof v === "object" ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(",")}}`
+  : JSON.stringify(v);
+const signature = (s) => canon({ ...s, overlay: null });
+function saveNow() {
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  lastSent = signature(settings);
+  return invoke("save_settings", { settings });
+}
 function saveSoon() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => invoke("save_settings", { settings }), 450);
+  saveTimer = setTimeout(saveNow, 450);
 }
+
+$("#wMin").onclick = () => win.minimize();
+$("#wClose").onclick = async () => {
+  if (saveTimer) await saveNow().catch(() => {});
+  invoke("quit");
+};
 
 // ── navigation with sliding indicator + staggered page entrance ──
 const ind = $("#ind");
@@ -210,6 +225,25 @@ $("#ovShow").onclick = () => invoke("set_overlay_visible", { visible: !isOn($("#
 $("#ovLock").onclick = () => invoke("set_overlay_locked", { locked: !isOn($("#ovLock")) });
 listen("overlay-visible", ({ payload }) => { ovVisible = payload; toggle($("#ovShow"), payload); homeSub(); });
 listen("overlay-locked", ({ payload }) => toggle($("#ovLock"), payload));
+
+// which monitor the windows open on (only shown with more than one monitor)
+async function renderDisplays() {
+  const list = await invoke("list_displays");
+  $("#displayRow").hidden = list.length < 2;
+  if (list.length < 2) return;
+  const segEl = $("#displaySeg");
+  segEl.innerHTML = list.map((d) => `<button aria-pressed="${d.current}" data-v="${escapeHtml(d.name)}">${escapeHtml(d.label)}</button>`).join("");
+  const th = document.createElement("span");
+  th.className = "thumb";
+  segEl.prepend(th);
+  requestAnimationFrame(() => placeThumb(segEl));
+}
+$("#displaySeg").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.getAttribute("aria-pressed") === "true") return;
+  setSeg("#displaySeg", b.dataset.v);
+  invoke("set_display", { name: b.dataset.v });
+});
 
 // waveform: rises with the live state, settles to a calm line otherwise
 const wc = $("#wave"), wg = wc.getContext("2d");
@@ -402,6 +436,8 @@ function applySettings(s) {
   homeSub();
 }
 listen("settings-changed", ({ payload }) => {
+  // Our own save echoing back: keep the page as it is, so an input being typed in keeps focus.
+  if (settings && signature(payload) === lastSent) { settings.overlay = payload.overlay; return; }
   const wasRegion = JSON.stringify(settings?.region);
   applySettings(payload);
   if (JSON.stringify(payload.region) !== wasRegion && page === "region") refreshPreview();
@@ -413,6 +449,7 @@ listen("settings-changed", ({ payload }) => {
   setState(snap.state);
   toggle($("#ovLock"), snap.locked);
   if (snap.ocr) $("#ocrText").textContent = `Windows 文字识别 · ${snap.ocr}`;
+  renderDisplays();
   requestAnimationFrame(() => { placeInd(); $$(".seg").forEach(placeThumb); });
   document.fonts?.ready.then(() => { placeInd(); $$(".seg").forEach(placeThumb); });
   if (!settings.region) showMsg("warn", "第一步：到「识别区域」框选 MultiViewer 的无线电转录卡片。");

@@ -73,3 +73,5 @@ document.addEventListener("keydown", (e) => {
 invoke("selector_info").then(({ region }) => {
   if (region && region.w > 0) { rect = clamp({ ...region }); render(); }
 });
+// Tell the backend the page is painted; only then does it hide the other windows.
+requestAnimationFrame(() => requestAnimationFrame(() => invoke("selector_ready")));

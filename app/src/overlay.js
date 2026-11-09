@@ -102,6 +102,13 @@ function setState(s, message) {
   else $("#stText").textContent = s === "idle" ? "未开始" : s === "paused" ? "已暂停" : "正在翻译";
 }
 listen("radio-status", ({ payload }) => {
+  // After a stop no translation will arrive; show the English instead of waiting dots.
+  if (payload.state === "idle") {
+    linesEl.querySelectorAll(".ln .wait").forEach((w) => {
+      const el = w.closest(".ln");
+      resolve(el, el.querySelector(".en")?.textContent || "", true);
+    });
+  }
   const short = payload.level === "info" && payload.state === "live" ? null : payload.message;
   setState(payload.state, short);
   if (payload.level !== "info") toast(payload.message);

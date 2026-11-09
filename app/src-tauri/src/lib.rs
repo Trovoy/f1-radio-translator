@@ -8,13 +8,14 @@ mod vision;
 use engine::{RunState, Shared};
 use serde::{Deserialize, Serialize};
 use settings::{Region, Settings, Style, WindowRect};
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
-    AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindowBuilder, WindowEvent,
+    AppHandle, Emitter, Manager, Monitor, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindowBuilder,
+    WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -127,6 +128,9 @@ fn overlay_demo(app: AppHandle, n: usize) {
 
 #[tauri::command]
 fn set_overlay_visible(app: AppHandle, visible: bool) {
+    if let Some(s) = app.try_state::<Arc<Shared>>() {
+        s.overlay_hidden.store(!visible, Ordering::SeqCst);
+    }
     if let Some(w) = app.get_webview_window("overlay") {
         let _ = if visible { w.show() } else { w.hide() };
         let _ = app.emit("overlay-visible", visible);
@@ -151,8 +155,12 @@ fn open_main(app: AppHandle, page: Option<String>) {
 
 // ── region selector ──
 
+static SELECTOR_READY: AtomicBool = AtomicBool::new(false);
+
+// Must be async: on Windows, creating a webview inside a synchronous command
+// blocks the event loop, which froze the whole desktop under the selector.
 #[tauri::command]
-fn select_region(app: AppHandle) -> Result<(), String> {
+async fn select_region(app: AppHandle) -> Result<(), String> {
     if app.get_webview_window("selector").is_some() {
         return Ok(());
     }
@@ -163,14 +171,11 @@ fn select_region(app: AppHandle) -> Result<(), String> {
         .flatten()
         .or_else(|| main.primary_monitor().ok().flatten())
         .ok_or("找不到显示器")?;
-    let scale = monitor.scale_factor();
-    let pos = monitor.position().to_logical::<f64>(scale);
-    let size = monitor.size().to_logical::<f64>(scale);
-    let _ = main.hide();
-    if let Some(o) = app.get_webview_window("overlay") {
-        let _ = o.hide();
-    }
-    WebviewWindowBuilder::new(&app, "selector", WebviewUrl::App("selector.html".into()))
+    let (pos, size) = (*monitor.position(), *monitor.size());
+    SELECTOR_READY.store(false, Ordering::SeqCst);
+    // A global Esc always gets the user out, even if the selector never takes focus.
+    let _ = app.global_shortcut().register(Shortcut::new(None, Code::Escape));
+    let built = WebviewWindowBuilder::new(&app, "selector", WebviewUrl::App("selector.html".into()))
         .title("框选识别区域")
         .decorations(false)
         .transparent(true)
@@ -178,12 +183,43 @@ fn select_region(app: AppHandle) -> Result<(), String> {
         .always_on_top(true)
         .skip_taskbar(true)
         .resizable(false)
-        .position(pos.x, pos.y)
-        .inner_size(size.width, size.height)
-        .focused(true)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .visible(false)
+        .build();
+    let w = match built {
+        Ok(w) => w,
+        Err(e) => {
+            let _ = app.global_shortcut().unregister(Shortcut::new(None, Code::Escape));
+            return Err(format!("无法打开框选界面：{e}"));
+        }
+    };
+    // Physical pixels: logical sizes go wrong when monitors use different scaling.
+    let _ = w.set_position(PhysicalPosition::new(pos.x, pos.y));
+    let _ = w.set_size(PhysicalSize::new(size.width, size.height));
+    let _ = w.show();
+    let _ = w.set_focus();
+    // Watchdog: if the page never reports ready, take the window down again.
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(8));
+        if !SELECTOR_READY.load(Ordering::SeqCst) && handle.get_webview_window("selector").is_some() {
+            close_selector(&handle);
+        }
+    });
     Ok(())
+}
+
+/// Called by the selector page once it is painted; only then are the other windows hidden.
+#[tauri::command]
+fn selector_ready(app: AppHandle) {
+    SELECTOR_READY.store(true, Ordering::SeqCst);
+    for label in ["main", "overlay"] {
+        if let Some(w) = app.get_webview_window(label) {
+            let _ = w.hide();
+        }
+    }
+    if let Some(w) = app.get_webview_window("selector") {
+        let _ = w.set_focus();
+    }
 }
 
 #[derive(Serialize)]
@@ -207,10 +243,12 @@ fn selector_info(app: AppHandle, shared: S) -> SelectorInfo {
 }
 
 fn close_selector(app: &AppHandle) {
+    let _ = app.global_shortcut().unregister(Shortcut::new(None, Code::Escape));
     if let Some(w) = app.get_webview_window("selector") {
-        let _ = w.close();
+        let _ = w.destroy();
     }
-    if let Some(o) = app.get_webview_window("overlay") {
+    let keep_hidden = app.try_state::<Arc<Shared>>().is_some_and(|s| s.overlay_hidden.load(Ordering::SeqCst));
+    if let (Some(o), false) = (app.get_webview_window("overlay"), keep_hidden) {
         let _ = o.show();
     }
     show_main(app, Some("region".into()));
@@ -225,7 +263,7 @@ struct CssRect {
 }
 
 #[tauri::command]
-fn finish_region(app: AppHandle, shared: S, rect: CssRect) -> Result<(), String> {
+async fn finish_region(app: AppHandle, shared: State<'_, Arc<Shared>>, rect: CssRect) -> Result<(), String> {
     let w = app.get_webview_window("selector").ok_or("selector missing")?;
     let origin = w.inner_position().map_err(|e| e.to_string())?;
     let scale = w.scale_factor().map_err(|e| e.to_string())?;
@@ -247,8 +285,9 @@ fn finish_region(app: AppHandle, shared: S, rect: CssRect) -> Result<(), String>
 }
 
 #[tauri::command]
-fn cancel_region(app: AppHandle) {
+async fn cancel_region(app: AppHandle) -> Result<(), String> {
     close_selector(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -259,13 +298,46 @@ fn quit(app: AppHandle, shared: S) {
 
 // ── overlay placement ──
 
+fn contains(m: &Monitor, x: i32, y: i32) -> bool {
+    let (p, s) = (m.position(), m.size());
+    x >= p.x && x < p.x + s.width as i32 && y >= p.y && y < p.y + s.height as i32
+}
+
+/// The monitor every window opens on: the one chosen in settings, else the primary one.
+fn target_monitor(app: &AppHandle, shared: &Shared) -> Option<Monitor> {
+    let main = app.get_webview_window("main")?;
+    let wanted = shared.settings.lock().unwrap().display.clone();
+    if let Some(name) = wanted {
+        if let Some(m) = main.available_monitors().ok()?.into_iter().find(|m| m.name().is_some_and(|n| *n == name)) {
+            return Some(m);
+        }
+    }
+    main.primary_monitor().ok().flatten()
+}
+
+fn place_main(app: &AppHandle, m: &Monitor) {
+    let Some(w) = app.get_webview_window("main") else { return };
+    let Ok(size) = w.outer_size() else { return };
+    let (p, s) = (m.position(), m.size());
+    let x = p.x + (s.width.saturating_sub(size.width) / 2) as i32;
+    let y = p.y + (s.height.saturating_sub(size.height) / 2) as i32;
+    let _ = w.set_position(PhysicalPosition::new(x, y));
+}
+
 fn place_overlay(app: &AppHandle, shared: &Shared) {
     let Some(w) = app.get_webview_window("overlay") else { return };
-    let saved = shared.settings.lock().unwrap().overlay;
+    let target = target_monitor(app, shared);
+    let mut saved = shared.settings.lock().unwrap().overlay;
+    // Keep a remembered spot only if it is still on the chosen monitor.
+    if let (Some(r), Some(m)) = (saved, target.as_ref()) {
+        if !contains(m, r.x + r.w as i32 / 2, r.y + r.h as i32 / 2) {
+            saved = None;
+        }
+    }
     if let Some(r) = saved {
         let _ = w.set_size(PhysicalSize::new(r.w, r.h));
         let _ = w.set_position(PhysicalPosition::new(r.x, r.y));
-    } else if let Ok(Some(m)) = w.primary_monitor() {
+    } else if let Some(m) = target {
         let (mp, ms, scale) = (m.position(), m.size(), m.scale_factor());
         let width = ((980.0 * scale) as u32).min(ms.width);
         let height = (260.0 * scale) as u32;
@@ -275,6 +347,53 @@ fn place_overlay(app: &AppHandle, shared: &Shared) {
         let _ = w.set_position(PhysicalPosition::new(x, y));
     }
     let _ = w.show();
+}
+
+#[derive(Serialize)]
+struct Display {
+    name: String,
+    label: String,
+    current: bool,
+}
+
+#[tauri::command]
+fn list_displays(app: AppHandle, shared: S) -> Vec<Display> {
+    let Some(main) = app.get_webview_window("main") else { return vec![] };
+    let primary = main.primary_monitor().ok().flatten();
+    let target = target_monitor(&app, &shared).and_then(|m| m.name().cloned());
+    let mut list: Vec<Monitor> = main.available_monitors().unwrap_or_default();
+    list.sort_by_key(|m| (m.position().x, m.position().y));
+    list.iter()
+        .filter_map(|m| {
+            let name = m.name()?.clone();
+            let s = m.size();
+            let label = match primary.as_ref() {
+                Some(p) if p.name() == m.name() => "主屏幕".to_string(),
+                Some(p) if m.position().x + s.width as i32 <= p.position().x => "左侧副屏".to_string(),
+                Some(p) if m.position().x >= p.position().x + p.size().width as i32 => "右侧副屏".to_string(),
+                _ => "副屏".to_string(),
+            };
+            Some(Display { current: target.as_ref() == Some(&name), label: format!("{label} {}×{}", s.width, s.height), name })
+        })
+        .collect()
+}
+
+/// Moves the main window and the subtitle window to the chosen monitor and remembers it.
+#[tauri::command]
+fn set_display(app: AppHandle, shared: S, name: String) -> Result<(), String> {
+    let snapshot = {
+        let mut s = shared.settings.lock().unwrap();
+        s.display = Some(name);
+        s.overlay = None;
+        s.clone()
+    };
+    shared.save()?;
+    if let Some(m) = target_monitor(&app, &shared) {
+        place_main(&app, &m);
+    }
+    place_overlay(&app, &shared);
+    let _ = app.emit("settings-changed", snapshot);
+    Ok(())
 }
 
 fn remember_overlay(app: &AppHandle) {
@@ -332,6 +451,11 @@ fn register_shortcuts(app: &AppHandle) {
 }
 
 fn on_shortcut(app: &AppHandle, shortcut: &Shortcut) {
+    if shortcut.key == Code::Escape {
+        // Only registered while the region selector is open.
+        close_selector(app);
+        return;
+    }
     let shared = app.state::<Arc<Shared>>().inner().clone();
     let mods = Modifiers::CONTROL | Modifiers::ALT;
     if !shortcut.mods.contains(mods) {
@@ -366,13 +490,32 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            let path = app.path().app_config_dir()?.join("settings.json");
+            // Debug builds can point at a throwaway settings file so tests never touch the real one.
+            let path = match std::env::var("F1RADIO_SETTINGS") {
+                Ok(p) if cfg!(debug_assertions) => std::path::PathBuf::from(p),
+                _ => app.path().app_config_dir()?.join("settings.json"),
+            };
             let shared = Arc::new(Shared::new(Settings::load(&path), path));
             app.manage(shared.clone());
             let handle = app.handle().clone();
             build_tray(&handle)?;
             register_shortcuts(&handle);
+            // Windows start hidden and appear only once they sit on the chosen monitor.
+            if let Some(m) = target_monitor(&handle, &shared) {
+                place_main(&handle, &m);
+            }
+            if let Some(w) = handle.get_webview_window("main") {
+                let _ = w.show();
+            }
             place_overlay(&handle, &shared);
+            // Development aid: `F1RADIO_AUTOSTART=1` starts translating right after launch.
+            if cfg!(debug_assertions) && std::env::var("F1RADIO_AUTOSTART").is_ok() {
+                let (h, s) = (handle.clone(), shared.clone());
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_secs(3));
+                    engine::start(h, s);
+                });
+            }
             // Development aid: `F1RADIO_DEMO=1` plays sample lines into the subtitle window.
             if cfg!(debug_assertions) && std::env::var("F1RADIO_DEMO").is_ok() {
                 let h = handle.clone();
@@ -408,8 +551,11 @@ pub fn run() {
             set_overlay_locked,
             set_overlay_visible,
             overlay_demo,
+            list_displays,
+            set_display,
             open_main,
             select_region,
+            selector_ready,
             selector_info,
             finish_region,
             cancel_region,

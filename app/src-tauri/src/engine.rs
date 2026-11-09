@@ -29,6 +29,7 @@ pub struct Shared {
     /// Bumped on every start and stop so a stale loop knows to exit.
     pub generation: AtomicU64,
     pub locked: AtomicBool,
+    pub overlay_hidden: AtomicBool,
     pub ocr_language: Mutex<String>,
     cooldown: Mutex<HashMap<String, Instant>>,
     history: Mutex<HashMap<String, VecDeque<String>>>,
@@ -43,6 +44,7 @@ impl Shared {
             state: Mutex::new(RunState::Idle),
             generation: AtomicU64::new(0),
             locked: AtomicBool::new(false),
+            overlay_hidden: AtomicBool::new(false),
             ocr_language: Mutex::new(String::new()),
             cooldown: Mutex::new(HashMap::new()),
             history: Mutex::new(HashMap::new()),

@@ -136,7 +136,9 @@ fn post_edit(en: &str, zh: String) -> String {
         out = out.replace("双黄色", "双黄旗");
     }
     if has("boost") {
-        out = out.replace("涡轮增压", "Boost");
+        for wrong in ["涡轮增压器", "涡轮增压", "助推器", "推进器", "增压器", "加速器"] {
+            out = out.replace(wrong, "Boost");
+        }
     }
     out
 }

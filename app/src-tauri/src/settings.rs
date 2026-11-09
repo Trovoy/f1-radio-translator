@@ -54,6 +54,8 @@ pub struct Settings {
     pub context_lines: u32,
     pub auto_fallback: bool,
     pub overlay: Option<WindowRect>,
+    /// Monitor name (e.g. `\\.\DISPLAY1`) that every window opens on; `None` means the primary one.
+    pub display: Option<String>,
 }
 
 impl Default for Settings {
@@ -68,6 +70,7 @@ impl Default for Settings {
             context_lines: 2,
             auto_fallback: true,
             overlay: None,
+            display: None,
         }
     }
 }

@@ -75,8 +75,9 @@ pub fn capture(r: &Region) -> Result<Frame, String> {
             ..Default::default()
         };
         let mut bgra = vec![0u8; (r.w * r.h * 4) as usize];
-        let rows = GetDIBits(mem, bmp, 0, r.h as u32, Some(bgra.as_mut_ptr() as _), &mut info, DIB_RGB_COLORS);
+        // GetDIBits requires the bitmap to be deselected first.
         SelectObject(mem, old);
+        let rows = GetDIBits(screen, bmp, 0, r.h as u32, Some(bgra.as_mut_ptr() as _), &mut info, DIB_RGB_COLORS);
         let _ = DeleteObject(bmp.into());
         let _ = DeleteDC(mem);
         ReleaseDC(None, screen);

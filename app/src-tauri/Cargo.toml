@@ -49,5 +49,4 @@ windows = { version = "0.61", features = [
 codegen-units = 1
 lto = true
 opt-level = "s"
-panic = "abort"
 strip = true
