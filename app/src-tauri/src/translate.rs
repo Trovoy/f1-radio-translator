@@ -18,18 +18,57 @@ pub struct Job<'a> {
     /// Earlier lines from the same speaker, oldest first.
     pub context: &'a [String],
     pub glossary: &'a str,
+    /// Whose radio channel the line came from, e.g. "Arvid Lindblad"; empty when unknown.
+    pub speaker: &'a str,
 }
 
-pub const GLOSSARY: &str = "box / box box = 进站（无线电指令）
+pub const GLOSSARY: &str = "copy / copy that = 收到（确认听到，不是复制）
+box / box box / box this lap = 进站（无线电指令）
+stay out = 留在赛道上，不进站
 lift and coast = 松油滑行
+push / push now = 全力推进
 track limits = 赛道界限；strike 在此语境下指警告次数，不是撞击
 Boost = Boost（能量部署），2026 规则下的 ERS 部署按钮，不要译成涡轮增压
 Overtake Mode = 超车模式，与 Boost 区分
+recharge / harvest = 回收能量
 stint = 赛段（视上下文可译为轮胎使用阶段）
-double yellows = 双黄旗
-pit entry = 维修区入口
-recharge = 回收能量
+set eight / set of tyres = 第八套轮胎
+softs / mediums / hards / inters / wets = 软胎 / 中性胎 / 硬胎 / 半雨胎 / 全雨胎
+deg = 轮胎衰退
+undercut / overcut = 提前进站反超 / 晚进站反超
+gap / delta = 差距 / 时间差
+opening lap / lap one = 首圈
+safety car / VSC = 安全车 / 虚拟安全车
+blue flags = 蓝旗；double yellows = 双黄旗
+pit entry / pit exit = 维修区入口 / 维修区出口
+P1, P2 = 第 1 名、第 2 名
+Checo = Sergio Pérez 的昵称，保留 Checo
 [unclear] = [听不清]";
+
+/// Radio slang rewritten into plain English before machine translation, which cannot read a glossary.
+pub fn pre_edit(en: &str) -> String {
+    static RULES: std::sync::OnceLock<Vec<(regex::Regex, &'static str)>> = std::sync::OnceLock::new();
+    let rules = RULES.get_or_init(|| {
+        [
+            (r"(?i)^\s*copy that\b[,.!]?\s*", "Understood. "),
+            (r"(?i)^\s*copy\b[,.!]?\s*", "Understood. "),
+            (r"(?i)([.!?]\s+)copy\b[,.!]?\s*", "${1}Understood. "),
+            (r"(?i)\bbox,?\s+box\b", "pit now, pit now"),
+            (r"(?i)\bbox this lap\b", "pit this lap"),
+            (r"(?i)\bbox now\b", "pit now"),
+            (r"(?i)\bstay out\b", "stay out on track"),
+            (r"(?i)\bopening lap\b", "first lap"),
+        ]
+        .into_iter()
+        .filter_map(|(p, r)| regex::Regex::new(p).ok().map(|re| (re, r)))
+        .collect()
+    });
+    let mut out = en.to_string();
+    for (re, rep) in rules {
+        out = re.replace_all(&out, *rep).into_owned();
+    }
+    out.trim().to_string()
+}
 
 const SYSTEM: &str = "You translate live Formula 1 team-radio transcript lines into concise, natural Simplified Chinese. \
 Keep the spoken tone. Preserve driver names, team names, car numbers, lap and turn numbers, decimals and units exactly. \
@@ -56,6 +95,12 @@ fn need<'a>(cfg: &'a Fields, k: &str, label: &str) -> Result<&'a str, String> {
 
 fn chat_system(job: &Job) -> String {
     let mut s = format!("{SYSTEM}\n\nTerminology (English = Chinese):\n{}", job.glossary);
+    if !job.speaker.trim().is_empty() {
+        s.push_str(&format!(
+            "\n\nThis line is from {}'s radio channel: it is either that driver speaking or their race engineer speaking to them. Use this to resolve \"you\", names and missing subjects.",
+            job.speaker.trim()
+        ));
+    }
     if !job.context.is_empty() {
         s.push_str("\n\nEarlier lines from the same speaker, for context only (do not translate them):\n");
         for line in job.context {
@@ -143,6 +188,10 @@ fn post_edit(en: &str, zh: String) -> String {
         for wrong in ["涡轮增压器", "涡轮增压", "助推器", "推进器", "增压器", "加速器"] {
             out = out.replace(wrong, "Boost");
         }
+        // DeepL treats instructions as hints and still writes "使用加速" for "use boost".
+        if !out.contains("Boost") {
+            out = out.replacen("加速", "Boost", 1);
+        }
     }
     out
 }
@@ -169,7 +218,7 @@ const NAMES: &[&str] = &[
     "Gasly", "Colapinto", "Ocon", "Bearman", "Hulkenberg", "Hülkenberg", "Bortoleto", "Lawson", "Lindblad", "Albon",
     "Sainz", "Perez", "Pérez", "Bottas", "Tsunoda", "Doohan", "Max", "Isack", "Charles", "Lewis", "George", "Kimi",
     "Lando", "Oscar", "Fernando", "Lance", "Pierre", "Franco", "Esteban", "Oliver", "Nico", "Gabriel", "Liam", "Arvid",
-    "Carlos", "Sergio", "Valtteri", "Yuki", "Jack",
+    "Carlos", "Sergio", "Valtteri", "Yuki", "Jack", "Checo", "Hulk", "Seb",
 ];
 
 /// Machine translation transliterates names (Bearman → 贝尔曼). Swap them for tokens it leaves alone.
@@ -202,8 +251,8 @@ pub async fn translate(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Res
     if !is_mt {
         return route(c, id, cfg, job).await;
     }
-    let (text, names) = protect_names(job.text);
-    let zh = route(c, id, cfg, &Job { text: &text, context: job.context, glossary: job.glossary }).await?;
+    let (text, names) = protect_names(&pre_edit(job.text));
+    let zh = route(c, id, cfg, &Job { text: &text, context: job.context, glossary: job.glossary, speaker: job.speaker }).await?;
     Ok(post_edit(job.text, restore_names(&zh, &names)))
 }
 
@@ -292,16 +341,43 @@ async fn deepl(c: &Client, cfg: &Fields, job: &Job<'_>) -> Result<String, String
         context.push_str(" Earlier lines: ");
         context.push_str(&job.context.join(" "));
     }
-    let body = json!({
+    let mut body = json!({
         "text": [job.text],
         "source_lang": "EN",
         "target_lang": "ZH-HANS",
         "context": context,
-        "split_sentences": "0"
+        "split_sentences": "0",
+        "model_type": "quality_optimized",
+        "custom_instructions": DEEPL_INSTRUCTIONS
     });
-    let v = send(c.post(format!("{host}/v2/translate")).header("Authorization", format!("DeepL-Auth-Key {key}")).json(&body)).await?;
-    pick(&v, "/translations/0/text")
+    let url = format!("{host}/v2/translate");
+    let auth = format!("DeepL-Auth-Key {key}");
+    match send(c.post(&url).header("Authorization", &auth).json(&body)).await {
+        Ok(v) => pick(&v, "/translations/0/text"),
+        // Not every plan accepts custom instructions or the quality model; retry with context only.
+        Err(e) if e.starts_with("HTTP 400") => {
+            if cfg!(debug_assertions) {
+                eprintln!("[deepl] custom instructions rejected, retrying without: {e}");
+            }
+            body.as_object_mut().map(|o| {
+                o.remove("custom_instructions");
+                o.remove("model_type");
+            });
+            let v = send(c.post(&url).header("Authorization", &auth).json(&body)).await?;
+            pick(&v, "/translations/0/text")
+        }
+        Err(e) => Err(e),
+    }
 }
+
+/// DeepL's short "prompt": at most 10 instructions of 300 characters each.
+const DEEPL_INSTRUCTIONS: [&str; 5] = [
+    "Translate live Formula 1 driver-engineer team radio into short, natural spoken Simplified Chinese. Return only the translation.",
+    "Radio terms: Copy / Understood means 收到; Box or pit means 进站; Stay out means 留在赛道上; Push means 全力推进; Set eight means 第八套轮胎; opening lap means 首圈.",
+    "Keep every person's name and nickname in English exactly as written (e.g. Checo, Max, Bearman, Leclerc, Lindblad); never transliterate names.",
+    "Boost is the driver's ERS energy-deployment button, write Boost（能量部署）, never 涡轮增压. Overtake Mode means 超车模式. Lift and coast means 松油滑行. Track limits means 赛道界限.",
+    "The text comes from speech recognition and may contain errors or [unclear]; translate [unclear] as [听不清] and do not invent missing words.",
+];
 
 async fn google(c: &Client, cfg: &Fields, job: &Job<'_>) -> Result<String, String> {
     let key = need(cfg, "key", "API Key")?;

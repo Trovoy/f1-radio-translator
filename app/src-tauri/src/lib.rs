@@ -87,7 +87,7 @@ struct TestResult {
 #[tauri::command]
 async fn test_provider(id: String, fields: translate::Fields) -> Result<TestResult, String> {
     let client = translate::client();
-    let job = translate::Job { text: "Box this lap, we're going to the hard tyre.", context: &[], glossary: translate::GLOSSARY };
+    let job = translate::Job { text: "Box this lap, we're going to the hard tyre.", context: &[], glossary: translate::GLOSSARY, speaker: "" };
     let t0 = Instant::now();
     let text = translate::translate(&client, &id, &fields, &job).await?;
     Ok(TestResult { text, ms: t0.elapsed().as_millis() as u64 })

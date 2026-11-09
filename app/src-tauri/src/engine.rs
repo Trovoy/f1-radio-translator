@@ -318,7 +318,7 @@ pub async fn translate_with_chain(
             continue;
         }
         let cfg = providers.get(id).unwrap_or(&empty);
-        let job = Job { text, context: &context, glossary: GLOSSARY };
+        let job = Job { text, context: &context, glossary: GLOSSARY, speaker };
         let t0 = Instant::now();
         match translate::translate(client, id, cfg, &job).await {
             Ok(zh) => {

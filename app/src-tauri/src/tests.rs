@@ -47,7 +47,7 @@ fn relative_time_rows_close_a_card() {
 #[tokio::test]
 #[ignore = "uses the network"]
 async fn mymemory_translates() {
-    let job = Job { text: "Box this lap, we're going to the hard tyre.", context: &[], glossary: GLOSSARY };
+    let job = Job { text: "Box this lap, we're going to the hard tyre.", context: &[], glossary: GLOSSARY, speaker: "" };
     let zh = translate::translate(&translate::client(), "mymemory", &HashMap::new(), &job).await.expect("translation");
     println!("{zh}");
     assert!(zh.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)));
@@ -123,8 +123,38 @@ fn names_round_trip_through_tokens() {
 #[tokio::test]
 #[ignore = "uses the network"]
 async fn mymemory_keeps_driver_names() {
-    let job = Job { text: "Bearman, next target, three reds. Leclerc is pitting.", context: &[], glossary: GLOSSARY };
+    let job = Job { text: "Bearman, next target, three reds. Leclerc is pitting.", context: &[], glossary: GLOSSARY, speaker: "" };
     let zh = translate::translate(&translate::client(), "mymemory", &HashMap::new(), &job).await.expect("translation");
     println!("{zh}");
     assert!(zh.contains("Bearman") && zh.contains("Leclerc"), "{zh}");
+}
+
+#[test]
+fn radio_slang_is_rewritten_for_machine_translation() {
+    assert_eq!(translate::pre_edit("Copy for Checo for opening lap."), "Understood. for Checo for first lap.");
+    assert_eq!(translate::pre_edit("Copy that, box box."), "Understood. pit now, pit now.");
+    assert_eq!(translate::pre_edit("Okay. Copy. Stay out."), "Okay. Understood. stay out on track.");
+    assert_eq!(translate::pre_edit("We can copy his line."), "We can copy his line.", "mid-sentence copy keeps its meaning");
+}
+
+/// Translates sample radio lines with the DeepL key from the user's own settings file.
+#[tokio::test]
+#[ignore = "uses the network and the local settings"]
+async fn deepl_samples_from_user_settings() {
+    let path = std::path::PathBuf::from(std::env::var("APPDATA").unwrap()).join("com.trovoy.f1radio/settings.json");
+    let s = crate::settings::Settings::load(&path);
+    let cfg = s.providers.get("deepl").cloned().expect("no DeepL settings");
+    for line in [
+        "Copy for Checo for opening lap.",
+        "Okay, Max. Box this lap. Set eight, set eight.",
+        "Bearman, three reds. [unclear] Leclerc.",
+        "Stay out, stay out. We are going plan B.",
+        "You can use boost on the straight, lift and coast into turn one.",
+    ] {
+        let job = Job { text: line, context: &[], glossary: GLOSSARY, speaker: "" };
+        match translate::translate(&translate::client(), "deepl", &cfg, &job).await {
+            Ok(zh) => println!("OK  {line}\n    → {zh}"),
+            Err(e) => println!("ERR {line}\n    → {e}"),
+        }
+    }
 }
