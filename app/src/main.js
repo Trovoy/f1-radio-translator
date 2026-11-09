@@ -8,6 +8,8 @@ const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let settings = null;
 let state = "idle";
+let localStats = null; // built-in model speed: { running, stats, gpu }
+let benching = false;
 let ovVisible = true;
 const lines = new Map(); // id -> { speaker, text, zh, ms, pending }
 let queue = 0;
@@ -134,7 +136,7 @@ function homeSub() {
   if (!settings) return;
   const r = settings.region;
   $("#hSub").textContent = [
-    providerName(settings.chain[0]),
+    providerName(settings.chain[0]) + (settings.chain[0] === "local" && localStats?.stats?.gen_tps ? ` · ${Math.round(localStats.stats.gen_tps)} tok/s` : ""),
     r ? `识别区域 ${r.w} × ${r.h}` : "尚未框选识别区域",
     ovVisible ? "字幕窗已显示" : "字幕窗已隐藏",
   ].join(" · ");
@@ -400,12 +402,66 @@ function localPanelHTML() {
       + (localErr[m.id] ? `<div class="lm-err">${escapeHtml(localErr[m.id])}</div>` : "")
       + `</div>`;
   }).join("");
-  return `<div class="lm-engine">${engine}</div><div class="lm-list">${cards}</div>`;
+  return `<div class="lm-engine">${engine}</div>${perfHTML(using)}<div class="lm-list">${cards}</div>`;
 }
+
+// ── live speed of the loaded model ──
+
+function perfHTML(using) {
+  const m = localInfo.models.find((x) => x.id === using && x.installed);
+  if (!m) return "";
+  return `<div class="lm-perf">`
+    + `<div class="lm-perf-head"><span class="lm-perf-t">运行状态</span><span class="lm-perf-sub" id="lpSub"></span>`
+    + `<button class="btn ghost" data-lbench="${m.id}"${benching ? " disabled" : ""}>${benching ? "测速中…" : "测速"}</button></div>`
+    + `<div class="lm-stats">`
+    + `<div><b id="lpTps">–</b><span>生成速度</span></div>`
+    + `<div><b id="lpLat">–</b><span>单句耗时</span></div>`
+    + `<div><b id="lpFirst">–</b><span>首字延迟</span></div>`
+    + `<div><b id="lpVram">–</b><span id="lpVramL">显存</span></div>`
+    + `</div><svg class="lm-spark" id="lpSpark" viewBox="0 0 300 28" preserveAspectRatio="none"><path/></svg></div>`;
+}
+
+function paintPerf() {
+  const sub = $("#lpSub");
+  if (!sub) return;
+  const r = localStats, s = r?.stats;
+  const using = settings?.providers?.local?.model;
+  const fresh = s && s.model === using;
+  const name = localInfo?.models.find((x) => x.id === using)?.name ?? "";
+  sub.textContent = r?.running === using
+    ? [`${name} 已加载`, fresh && s.load_ms ? `用时 ${(s.load_ms / 1000).toFixed(1)} 秒` : "", fresh && s.calls ? `已翻译 ${s.calls} 句` : ""].filter(Boolean).join(" · ")
+    : fresh && s.calls ? `未加载 · 以下是上次运行的数据` : "未加载 · 开始翻译或点测速时自动加载";
+  const has = fresh && s.calls > 0;
+  $("#lpTps").innerHTML = has && s.gen_tps ? `${Math.round(s.gen_tps)}<small>tok/s</small>` : "–";
+  $("#lpLat").innerHTML = has ? `${(s.avg_ms / 1000).toFixed(2)}<small>秒</small>` : "–";
+  $("#lpFirst").innerHTML = has && s.first_ms ? `${s.first_ms}<small>毫秒</small>` : "–";
+  const g = r?.gpu;
+  $("#lpVram").innerHTML = g ? `${(g.used_mb / 1024).toFixed(1)}<small>/ ${Math.round(g.total_mb / 1024)} GB</small>` : "–";
+  $("#lpVramL").textContent = g ? `显存 · GPU ${g.util}%` : "显存";
+  // Latency of the last 30 lines; the line rests at the bottom until there is data.
+  const pts = has ? s.recent : [];
+  const path = $("#lpSpark path");
+  if (pts.length < 2) { path.setAttribute("d", "M0 27 H300"); return; }
+  const max = Math.max(...pts) * 1.15, step = 300 / (pts.length - 1);
+  path.setAttribute("d", pts.map((v, i) => `${i ? "L" : "M"}${(i * step).toFixed(1)} ${(27 - (v / max) * 24).toFixed(1)}`).join(" "));
+}
+
+async function pollPerf() {
+  // Only while the local model panel is on screen.
+  if (!$("#lpSub")?.offsetParent) return;
+  try { localStats = await invoke("local_stats"); paintPerf(); } catch {}
+}
+setInterval(pollPerf, 2000);
+
+listen("local-stats", ({ payload }) => {
+  localStats = { ...(localStats ?? {}), stats: payload };
+  paintPerf();
+  homeSub();
+});
 
 function renderLocalPanel() {
   const w = $("#lmWrap");
-  if (w) w.innerHTML = localPanelHTML();
+  if (w) { w.innerHTML = localPanelHTML(); paintPerf(); pollPerf(); }
 }
 
 async function loadLocal() {
@@ -437,6 +493,15 @@ $("#plist").addEventListener("click", async (e) => {
     renderLocalPanel();
     try { await invoke("local_download", { id }); }
     catch (err) { if (String(err) !== "已取消") localErr[id] = `下载没有完成：${err}。再点一次「下载」会从断点继续。`; }
+    loadLocal();
+  } else if (t.dataset.lbench) {
+    const id = t.dataset.lbench;
+    delete localErr[id];
+    benching = true;
+    renderLocalPanel();
+    try { await invoke("local_bench", { id }); }
+    catch (err) { localErr[id] = `测速失败：${err}`; }
+    benching = false;
     loadLocal();
   } else if (t.hasAttribute("data-lcancel")) {
     invoke("local_cancel");

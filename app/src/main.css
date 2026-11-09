@@ -197,6 +197,7 @@ kbd { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-xs); p
 .page::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, .36); }
 
 /* ── built-in local models ── */
+#lmWrap { display: flex; flex-direction: column; gap: var(--s3); }
 .lm-engine { font-size: var(--fs-sm); color: var(--ink-3); }
 .lm-list { display: flex; flex-direction: column; gap: var(--s2); }
 .lm { border-radius: var(--r-lg); padding: 14px var(--s4); background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .3s var(--ease); }
@@ -220,3 +221,15 @@ kbd { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-xs); p
 .lm-using { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--ok); }
 .lm-using svg { width: 14px; height: 14px; }
 .lm-err { margin-top: var(--s2); font-size: var(--fs-sm); line-height: 1.5; color: #ffb4ab; }
+
+/* live speed of the built-in model */
+.lm-perf { border-radius: var(--r-lg); padding: 14px var(--s4) var(--s3); background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px var(--line); }
+.lm-perf-head { display: flex; align-items: center; gap: var(--s2); }
+.lm-perf-t { font-size: var(--fs-base); font-weight: 600; }
+.lm-perf-sub { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lm-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s3); margin-top: var(--s3); }
+.lm-stats b { display: block; font-family: var(--display); font-size: var(--fs-xl); font-weight: 300; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lm-stats b small { font-family: inherit; font-size: var(--fs-sm); color: var(--ink-3); margin-left: 3px; font-weight: 400; }
+.lm-stats span { display: block; margin-top: 2px; font-size: var(--fs-xs); color: var(--ink-3); }
+.lm-spark { display: block; width: 100%; height: 28px; margin-top: var(--s2); overflow: visible; }
+.lm-spark path { fill: none; stroke: rgba(95, 211, 154, .7); stroke-width: 1.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; transition: d .4s var(--ease); }

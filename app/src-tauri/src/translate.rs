@@ -22,7 +22,7 @@ pub struct Job<'a> {
     pub speaker: &'a str,
 }
 
-pub const GLOSSARY: &str = "copy / copy that = 收到（确认听到，不是复制）
+pub const GLOSSARY: &str = "copy / copy that = 收到（确认听到，不是复制或抄送；\"Copy for X\" = 收到，转告 X）
 box / box box / box this lap = 进站（无线电指令）
 stay out = 留在赛道上，不进站
 lift and coast = 松油滑行
@@ -460,7 +460,9 @@ async fn local_model(c: &Client, cfg: &Fields, job: &Job<'_>) -> Result<String, 
             "temperature": 0.2, "max_tokens": 256, "stream": false
         }),
     };
+    let t0 = std::time::Instant::now();
     let v = send(c.post(url).json(&body).timeout(Duration::from_secs(90))).await?;
+    crate::local::get().record_call(m.id, t0.elapsed().as_millis() as u64, v.get("timings"));
     let zh = strip_thinking(&pick(&v, "/choices/0/message/content")?);
     Ok(if m.style == crate::local::Style::HyMt { post_edit(job.text, zh) } else { zh })
 }

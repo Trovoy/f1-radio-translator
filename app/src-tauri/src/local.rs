@@ -4,6 +4,7 @@
 
 use futures_util::StreamExt;
 use serde::Serialize;
+use std::collections::VecDeque;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -136,6 +137,7 @@ pub struct Local {
     server: tokio::sync::Mutex<Option<Server>>,
     downloading: Mutex<Option<String>>,
     cancel: AtomicBool,
+    stats: Mutex<StatsInner>,
 }
 
 static LOCAL: OnceLock<Local> = OnceLock::new();
@@ -146,11 +148,85 @@ pub fn init(root: PathBuf) {
         server: tokio::sync::Mutex::new(None),
         downloading: Mutex::new(None),
         cancel: AtomicBool::new(false),
+        stats: Mutex::new(StatsInner::default()),
     });
 }
 
 pub fn get() -> &'static Local {
     LOCAL.get().expect("local engine not initialised")
+}
+
+static APP: OnceLock<AppHandle> = OnceLock::new();
+
+/// Lets the engine push load and speed updates to the pages.
+pub fn attach(app: AppHandle) {
+    let _ = APP.set(app);
+}
+
+fn notify(event: &str, payload: impl Serialize + Clone) {
+    if let Some(a) = APP.get() {
+        let _ = a.emit(event, payload);
+    }
+}
+
+struct Sample {
+    ms: u64,
+    prompt_n: f64,
+    prompt_ms: f64,
+    gen_n: f64,
+    gen_ms: f64,
+}
+
+#[derive(Default)]
+struct StatsInner {
+    model: String,
+    load_ms: u64,
+    calls: u64,
+    tokens: u64,
+    samples: VecDeque<Sample>,
+}
+
+/// Rolling speed numbers for the loaded model, over its last 30 lines.
+#[derive(Clone, Default, Serialize)]
+pub struct Stats {
+    pub model: String,
+    pub load_ms: u64,
+    pub calls: u64,
+    pub tokens: u64,
+    pub last_ms: u64,
+    pub avg_ms: u64,
+    /// Generated tokens per second.
+    pub gen_tps: f64,
+    /// Prompt tokens per second (the part before the first output token).
+    pub prompt_tps: f64,
+    /// Average time to the first output token.
+    pub first_ms: u64,
+    pub recent: Vec<u64>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct Gpu {
+    pub used_mb: u64,
+    pub total_mb: u64,
+    pub util: u64,
+}
+
+/// NVIDIA cards only: memory and load from nvidia-smi, which ships with the driver.
+pub fn gpu() -> Option<Gpu> {
+    if engine_kind() != "cuda" {
+        return None;
+    }
+    let mut cmd = Command::new("nvidia-smi");
+    cmd.args(["--query-gpu=memory.used,memory.total,utilization.gpu", "--format=csv,noheader,nounits"]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let out = cmd.output().ok()?;
+    let text = String::from_utf8_lossy(&out.stdout);
+    let v: Vec<u64> = text.lines().next()?.split(',').filter_map(|s| s.trim().parse().ok()).collect();
+    (v.len() == 3).then(|| Gpu { used_mb: v[0], total_mb: v[1], util: v[2] })
 }
 
 #[derive(Clone, Serialize)]
@@ -342,7 +418,59 @@ impl Local {
             tokio::time::sleep(Duration::from_millis(400)).await;
         }
         *guard = Some(Server { child, port, model: id.to_string() });
+        drop(guard);
+        self.record_load(id, t0.elapsed().as_millis() as u64);
+        notify("local-changed", ());
         Ok(port)
+    }
+
+    fn record_load(&self, model: &str, ms: u64) {
+        {
+            let mut s = self.stats.lock().unwrap();
+            if s.model != model {
+                *s = StatsInner { model: model.into(), ..Default::default() };
+            }
+            s.load_ms = ms;
+        }
+        notify("local-stats", self.stats());
+    }
+
+    /// Called after every translation with llama.cpp's own `timings` block.
+    pub fn record_call(&self, model: &str, ms: u64, timings: Option<&serde_json::Value>) {
+        let num = |k: &str| timings.and_then(|t| t.get(k)).and_then(|v| v.as_f64()).unwrap_or(0.0);
+        {
+            let mut s = self.stats.lock().unwrap();
+            if s.model != model {
+                *s = StatsInner { model: model.into(), ..Default::default() };
+            }
+            let sample = Sample { ms, prompt_n: num("prompt_n"), prompt_ms: num("prompt_ms"), gen_n: num("predicted_n"), gen_ms: num("predicted_ms") };
+            s.calls += 1;
+            s.tokens += sample.gen_n as u64;
+            s.samples.push_back(sample);
+            while s.samples.len() > 30 {
+                s.samples.pop_front();
+            }
+        }
+        notify("local-stats", self.stats());
+    }
+
+    pub fn stats(&self) -> Stats {
+        let s = self.stats.lock().unwrap();
+        let n = s.samples.len().max(1) as f64;
+        let sum = |f: fn(&Sample) -> f64| s.samples.iter().map(f).sum::<f64>();
+        let rate = |tok: f64, ms: f64| if ms > 0.0 { tok / ms * 1000.0 } else { 0.0 };
+        Stats {
+            model: s.model.clone(),
+            load_ms: s.load_ms,
+            calls: s.calls,
+            tokens: s.tokens,
+            last_ms: s.samples.back().map_or(0, |x| x.ms),
+            avg_ms: (sum(|x| x.ms as f64) / n) as u64,
+            gen_tps: rate(sum(|x| x.gen_n), sum(|x| x.gen_ms)),
+            prompt_tps: rate(sum(|x| x.prompt_n), sum(|x| x.prompt_ms)),
+            first_ms: (sum(|x| x.prompt_ms) / n) as u64,
+            recent: s.samples.iter().map(|x| x.ms).collect(),
+        }
     }
 
     /// Stops the server and frees the VRAM.
@@ -351,6 +479,8 @@ impl Local {
         if let Some(mut sv) = guard.take() {
             let _ = sv.child.kill();
             let _ = sv.child.wait();
+            drop(guard);
+            notify("local-changed", ());
         }
     }
 

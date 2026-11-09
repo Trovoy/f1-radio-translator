@@ -251,5 +251,8 @@ async fn local_model_end_to_end() {
             Err(e) => println!("[err] {line}\n        → {e}"),
         }
     }
+    let s = crate::local::get().stats();
+    println!("[stats] load {}ms · avg {}ms · gen {:.0} tok/s · prompt {:.0} tok/s · first {}ms · {} tokens", s.load_ms, s.avg_ms, s.gen_tps, s.prompt_tps, s.first_ms, s.tokens);
+    println!("[gpu] {:?}", crate::local::gpu().map(|g| (g.used_mb, g.total_mb, g.util)));
     crate::local::get().stop().await;
 }

@@ -148,6 +148,43 @@ async fn local_download(app: AppHandle, id: String) -> Result<(), String> {
     local::get().download(Some(&app), &id).await
 }
 
+#[derive(Serialize)]
+struct LocalStats {
+    running: Option<String>,
+    stats: local::Stats,
+    gpu: Option<local::Gpu>,
+}
+
+#[tauri::command]
+async fn local_stats() -> LocalStats {
+    let l = local::get();
+    let running = l.running().await;
+    // nvidia-smi only matters while a model holds the card.
+    let gpu = if running.is_some() { tauri::async_runtime::spawn_blocking(local::gpu).await.ok().flatten() } else { None };
+    LocalStats { running, stats: l.stats(), gpu }
+}
+
+/// Translates a few typical radio lines so the speed numbers fill in without a live session.
+#[tauri::command]
+async fn local_bench(id: String) -> Result<u64, String> {
+    let client = translate::client();
+    let mut fields = translate::Fields::new();
+    fields.insert("model".into(), id);
+    let t0 = Instant::now();
+    let lines = [
+        "Box this lap, box this lap. We're going to the hard tyre.",
+        "Gap to Leclerc is 1.4 seconds. He's on older mediums.",
+        "Copy. The rear is sliding a lot in the high-speed corners.",
+        "You can use boost on the straight, lift and coast into turn one.",
+        "Okay, Max, P2. Great recovery drive. Well done.",
+    ];
+    for text in lines {
+        let job = translate::Job { text, context: &[], glossary: translate::GLOSSARY, speaker: "" };
+        translate::translate(&client, "local", &fields, &job).await?;
+    }
+    Ok(t0.elapsed().as_millis() as u64)
+}
+
 #[tauri::command]
 fn local_cancel() {
     local::get().cancel();
@@ -552,6 +589,7 @@ pub fn run() {
             let shared = Arc::new(Shared::new(Settings::load(&path), path));
             app.manage(shared.clone());
             local::init(app.path().app_local_data_dir()?.join("local"));
+            local::attach(app.handle().clone());
             let handle = app.handle().clone();
             // Development aid: `F1RADIO_DRYRUN=1` prints where windows would open and exits before any shows.
             if cfg!(debug_assertions) && std::env::var("F1RADIO_DRYRUN").is_ok() {
@@ -612,6 +650,8 @@ pub fn run() {
             get_state,
             engine_cmd,
             test_provider,
+            local_stats,
+            local_bench,
             capture_preview,
             set_overlay_locked,
             set_overlay_visible,
