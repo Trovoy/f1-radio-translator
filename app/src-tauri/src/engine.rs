@@ -169,6 +169,7 @@ fn scan_loop(app: AppHandle, shared: Arc<Shared>, gen: u64, tx: mpsc::Sender<Lin
     let mut seen: HashSet<String> = HashSet::new();
     let mut first = true;
     let mut warned = false;
+    let mut recent: VecDeque<(String, String, u64)> = VecDeque::new();
 
     while alive() {
         let (region, interval, skip) = {
@@ -210,13 +211,18 @@ fn scan_loop(app: AppHandle, shared: Arc<Shared>, gen: u64, tx: mpsc::Sender<Lin
                                     }
                                 }
                                 if i < skip_n {
+                                    remember(&mut recent, &card.speaker, &card.text, 0);
                                     continue;
                                 }
-                                let line = Line {
-                                    id: shared.next_id.fetch_add(1, Ordering::SeqCst),
-                                    speaker: card.speaker,
-                                    text: card.text,
-                                };
+                                // A card that grew while the audio was still coming in keeps its
+                                // id, so the windows update that line instead of adding a copy.
+                                let id = grown_from(&recent, &card.speaker, &card.text)
+                                    .unwrap_or_else(|| shared.next_id.fetch_add(1, Ordering::SeqCst));
+                                remember(&mut recent, &card.speaker, &card.text, id);
+                                if !alive() {
+                                    return;
+                                }
+                                let line = Line { id, speaker: card.speaker, text: card.text };
                                 let _ = app.emit("radio-line", line.clone());
                                 if tx.blocking_send(line).is_err() {
                                     return;
@@ -241,6 +247,22 @@ fn scan_loop(app: AppHandle, shared: Arc<Shared>, gen: u64, tx: mpsc::Sender<Lin
             }
         }
         std::thread::sleep(Duration::from_millis(interval));
+    }
+}
+
+/// The id of a recent line from the same speaker that this text extends, if any.
+pub(crate) fn grown_from(recent: &VecDeque<(String, String, u64)>, speaker: &str, text: &str) -> Option<u64> {
+    recent.iter().rev().find_map(|(s, t, id)| {
+        let stem = t.trim_end_matches(['.', '…', ' ', ',']);
+        (*id != 0 && s == speaker && stem.len() >= 6 && text.len() > t.len() && text.starts_with(stem)).then_some(*id)
+    })
+}
+
+pub(crate) fn remember(recent: &mut VecDeque<(String, String, u64)>, speaker: &str, text: &str, id: u64) {
+    recent.retain(|(_, _, i)| *i != id || id == 0);
+    recent.push_back((speaker.to_string(), text.to_string(), id));
+    while recent.len() > 12 {
+        recent.pop_front();
     }
 }
 

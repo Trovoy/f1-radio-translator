@@ -143,6 +143,22 @@ fn post_edit(en: &str, zh: String) -> String {
     out
 }
 
+/// Same defaults the settings page shows, used when a saved config has no model yet.
+fn default_model(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "openai" => "gpt-6-luna",
+        "claude" => "claude-haiku-5-5",
+        "gemini" => "gemini-2.5-flash",
+        "deepseek" => "deepseek-chat",
+        "qwen" => "qwen-plus",
+        "glm" => "glm-4-flash",
+        "kimi" => "moonshot-v1-8k",
+        "silicon" => "Qwen/Qwen2.5-7B-Instruct",
+        "ollama" => "qwen2.5:7b",
+        _ => return None,
+    })
+}
+
 pub async fn translate(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Result<String, String> {
     let is_mt = matches!(id, "deepl" | "google" | "azure" | "baidu" | "youdao" | "tencent" | "aliyun" | "volc" | "mymemory" | "libre" | "deeplx");
     let zh = route(c, id, cfg, job).await?;
@@ -185,7 +201,10 @@ async fn openai_compat(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Res
     } else {
         format!("{base}/v1/chat/completions")
     };
-    let model = need(cfg, "model", "模型")?;
+    let model = match (f(cfg, "model"), default_model(id)) {
+        ("", Some(m)) => m,
+        _ => need(cfg, "model", "模型")?,
+    };
     let mut body = json!({
         "model": model,
         "messages": [
@@ -212,8 +231,9 @@ async fn anthropic(c: &Client, cfg: &Fields, job: &Job<'_>) -> Result<String, St
     let key = need(cfg, "key", "API Key")?;
     let base = match f(cfg, "url") { "" => "https://api.anthropic.com", s => s }.trim_end_matches('/');
     let url = if base.ends_with("/v1/messages") { base.to_string() } else { format!("{base}/v1/messages") };
+    let model = match f(cfg, "model") { "" => "claude-haiku-5-5", m => m };
     let body = json!({
-        "model": need(cfg, "model", "模型")?,
+        "model": model,
         "max_tokens": 300,
         "system": chat_system(job),
         "messages": [{ "role": "user", "content": job.text }]

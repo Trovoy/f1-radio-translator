@@ -71,6 +71,13 @@ function resolve(el, zh, failed) {
 }
 
 listen("radio-line", ({ payload }) => {
+  // Same id again: the card grew. Update the English in place and keep the current Chinese until the new one lands.
+  const known = byId.get(payload.id);
+  if (known?.isConnected) {
+    const en = known.querySelector(".en");
+    if (en) en.textContent = payload.text;
+    return;
+  }
   const el = push({ who: speakerLabel(payload.speaker), en: payload.text, pending: true });
   byId.set(payload.id, el);
   if (byId.size > 50) byId.delete(byId.keys().next().value);

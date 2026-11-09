@@ -165,6 +165,10 @@ function setState(s) {
   $("#hStop").classList.toggle("off", s === "idle");
   if (s === "idle") { clearInterval(clock); clock = null; secs = 0; $("#sideTime").textContent = "00:00"; queue = 0; stats(); }
   else if (prev === "idle" && !clock) {
+    // A new session counts from zero.
+    lines.clear();
+    queue = 0;
+    stats();
     clock = setInterval(() => {
       if (state !== "live") return;
       secs++;
@@ -190,7 +194,7 @@ listen("radio-status", ({ payload }) => {
   if (payload.level === "info" && payload.message.startsWith("正在识别")) $("#ocrText").textContent = payload.message.replace("正在识别 · ", "Windows 文字识别 · ");
 });
 listen("radio-line", ({ payload }) => {
-  lines.set(payload.id, { ...payload, pending: true });
+  lines.set(payload.id, { ...lines.get(payload.id), ...payload, pending: true });
   queue++;
   stats();
 });
@@ -305,10 +309,15 @@ function renderList(anim) {
   }).join("");
 }
 
+/** Writes the shown values, defaults included, into settings so the backend sees the same thing as the page. */
+function persistFields(id) {
+  settings.providers[id] = { ...fieldsFor(settings, id), ...settings.providers[id] };
+}
+
 $("#plist").addEventListener("input", (e) => {
   const t = e.target;
   if (!t.dataset.p) return;
-  settings.providers[t.dataset.p] ??= {};
+  persistFields(t.dataset.p);
   settings.providers[t.dataset.p][t.dataset.k] = t.value;
   saveSoon();
 });
@@ -323,6 +332,7 @@ $("#plist").addEventListener("click", async (e) => {
   }
   if (t.dataset.pri) {
     const id = t.dataset.pri;
+    persistFields(id);
     settings.chain = [id, ...settings.chain.filter((x) => x !== id)];
     renderChain(id);
     $$("#plist .pv").forEach((p) => p.classList.toggle("primary", p.dataset.id === id));
@@ -331,6 +341,7 @@ $("#plist").addEventListener("click", async (e) => {
     return;
   }
   if (t.dataset.add) {
+    persistFields(t.dataset.add);
     settings.chain = [...settings.chain, t.dataset.add];
     renderChain(t.dataset.add); renderList(false); saveSoon();
     return;
@@ -434,6 +445,9 @@ function applySettings(s) {
   applyStylePreview(s.style);
   renderRegion();
   homeSub();
+  // The first-run hint goes away once a region exists.
+  const msg = $("#hMsg");
+  if (s.region && msg.textContent.startsWith("第一步")) msg.hidden = true;
 }
 listen("settings-changed", ({ payload }) => {
   // Our own save echoing back: keep the page as it is, so an input being typed in keeps focus.

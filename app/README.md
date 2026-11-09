@@ -19,6 +19,9 @@ npx tauri dev
 | `F1RADIO_DEMO=1` | 字幕窗自动播放几句示例字幕，便于调样式 |
 | `F1RADIO_AUTOSTART=1` | 启动 3 秒后自动开始翻译 |
 | `F1RADIO_SETTINGS=路径` | 改用指定的设置文件，测试时不碰真实设置 |
+| `F1RADIO_DRYRUN=1` | 只打印会使用哪块显示器，然后退出，不显示任何窗口 |
+
+显示器按左上角坐标记忆（`display_at`），名称只作备用：Windows 重启后可能把 DISPLAY1 和 DISPLAY2 对调。
 
 ## 打包
 

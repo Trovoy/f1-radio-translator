@@ -52,3 +52,18 @@ async fn mymemory_translates() {
     println!("{zh}");
     assert!(zh.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)));
 }
+
+#[test]
+fn a_growing_card_keeps_its_id() {
+    use crate::engine::{grown_from, remember};
+    use std::collections::VecDeque;
+    let mut recent = VecDeque::new();
+    remember(&mut recent, "Race Engineer", "Box this lap", 7);
+    assert_eq!(grown_from(&recent, "Race Engineer", "Box this lap, box this lap."), Some(7));
+    assert_eq!(grown_from(&recent, "Lando Norris", "Box this lap, box this lap."), None, "other speaker");
+    assert_eq!(grown_from(&recent, "Race Engineer", "Box this"), None, "shorter text");
+    remember(&mut recent, "Race Engineer", "Box this lap, box this lap.", 7);
+    assert_eq!(recent.len(), 1, "the grown line replaces the old entry");
+    remember(&mut recent, "Race Engineer", "Skipped on the first pass", 0);
+    assert_eq!(grown_from(&recent, "Race Engineer", "Skipped on the first pass, more"), None, "first-pass cards are not reused");
+}

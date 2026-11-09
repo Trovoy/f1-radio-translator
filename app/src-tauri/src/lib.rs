@@ -306,10 +306,20 @@ fn contains(m: &Monitor, x: i32, y: i32) -> bool {
 /// The monitor every window opens on: the one chosen in settings, else the primary one.
 fn target_monitor(app: &AppHandle, shared: &Shared) -> Option<Monitor> {
     let main = app.get_webview_window("main")?;
-    let wanted = shared.settings.lock().unwrap().display.clone();
-    if let Some(name) = wanted {
-        if let Some(m) = main.available_monitors().ok()?.into_iter().find(|m| m.name().is_some_and(|n| *n == name)) {
-            return Some(m);
+    let (name, at) = {
+        let s = shared.settings.lock().unwrap();
+        (s.display.clone(), s.display_at)
+    };
+    let all = main.available_monitors().unwrap_or_default();
+    // Position first: Windows can swap DISPLAY1/DISPLAY2 after a reboot.
+    if let Some((x, y)) = at {
+        if let Some(m) = all.iter().find(|m| m.position().x == x && m.position().y == y) {
+            return Some(m.clone());
+        }
+    }
+    if let Some(name) = name {
+        if let Some(m) = all.iter().find(|m| m.name().is_some_and(|n| *n == name)) {
+            return Some(m.clone());
         }
     }
     main.primary_monitor().ok().flatten()
@@ -381,9 +391,15 @@ fn list_displays(app: AppHandle, shared: S) -> Vec<Display> {
 /// Moves the main window and the subtitle window to the chosen monitor and remembers it.
 #[tauri::command]
 fn set_display(app: AppHandle, shared: S, name: String) -> Result<(), String> {
+    let at = app
+        .get_webview_window("main")
+        .and_then(|w| w.available_monitors().ok())
+        .and_then(|all| all.into_iter().find(|m| m.name().is_some_and(|n| *n == name)))
+        .map(|m| (m.position().x, m.position().y));
     let snapshot = {
         let mut s = shared.settings.lock().unwrap();
         s.display = Some(name);
+        s.display_at = at;
         s.overlay = None;
         s.clone()
     };
@@ -498,6 +514,12 @@ pub fn run() {
             let shared = Arc::new(Shared::new(Settings::load(&path), path));
             app.manage(shared.clone());
             let handle = app.handle().clone();
+            // Development aid: `F1RADIO_DRYRUN=1` prints the chosen monitor and exits before any window shows.
+            if cfg!(debug_assertions) && std::env::var("F1RADIO_DRYRUN").is_ok() {
+                let m = target_monitor(&handle, &shared);
+                eprintln!("[dryrun] target={:?}", m.map(|m| (m.name().cloned(), *m.position(), *m.size())));
+                std::process::exit(0);
+            }
             build_tray(&handle)?;
             register_shortcuts(&handle);
             // Windows start hidden and appear only once they sit on the chosen monitor.
@@ -508,6 +530,15 @@ pub fn run() {
                 let _ = w.show();
             }
             place_overlay(&handle, &shared);
+            if cfg!(debug_assertions) {
+                let pos = |l: &str| handle.get_webview_window(l).and_then(|w| w.outer_position().ok());
+                eprintln!(
+                    "[place] target={:?} main={:?} overlay={:?}",
+                    target_monitor(&handle, &shared).map(|m| (m.name().cloned(), *m.position())),
+                    pos("main"),
+                    pos("overlay")
+                );
+            }
             // Development aid: `F1RADIO_AUTOSTART=1` starts translating right after launch.
             if cfg!(debug_assertions) && std::env::var("F1RADIO_AUTOSTART").is_ok() {
                 let (h, s) = (handle.clone(), shared.clone());
