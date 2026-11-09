@@ -205,3 +205,51 @@ fn thinking_blocks_are_removed() {
     assert_eq!(translate::strip_thinking("reasoning without an opening tag</think>收到。"), "收到。");
     assert_eq!(translate::strip_thinking("收到，Checo。"), "收到，Checo。");
 }
+
+#[test]
+fn hymt_prompt_carries_terms_names_and_context() {
+    let ctx = vec!["Gap behind is 2.4.".to_string()];
+    let job = Job { text: "Copy, box this lap. Bearman is on softs.", context: &ctx, glossary: GLOSSARY, speaker: "Arvid Lindblad" };
+    let p = translate::hymt_prompt(&job);
+    println!("{p}");
+    assert!(p.contains("copy 翻译成 收到"));
+    assert!(p.contains("box 翻译成 进站"));
+    assert!(p.contains("softs 翻译成 软胎"));
+    assert!(p.contains("Bearman 翻译成 Bearman"));
+    assert!(p.contains("Arvid Lindblad 的频道") && p.contains("Gap behind is 2.4."));
+    assert!(p.trim_end().ends_with("Copy, box this lap. Bearman is on softs."));
+    assert!(!p.contains("copy that"), "only terms present in the line are listed");
+}
+
+/// Downloads the engine and a model into the app's real data folder (so nothing is fetched twice),
+/// then translates sample radio lines on the GPU. Pick the model with `F1RADIO_LOCAL_MODEL`.
+#[tokio::test]
+#[ignore = "downloads gigabytes and uses the GPU"]
+async fn local_model_end_to_end() {
+    let root = std::path::PathBuf::from(std::env::var("LOCALAPPDATA").unwrap()).join("com.trovoy.f1radio/local");
+    crate::local::init(root);
+    let id = std::env::var("F1RADIO_LOCAL_MODEL").unwrap_or_else(|_| "hy-mt-1.8b".into());
+    crate::local::get().download(None, &id).await.expect("download");
+    let t0 = std::time::Instant::now();
+    crate::local::get().ensure_server(&id).await.expect("server");
+    println!("[load] {id} ready in {:.1}s", t0.elapsed().as_secs_f64());
+    let mut cfg = HashMap::new();
+    cfg.insert("model".to_string(), id.clone());
+    let client = translate::client();
+    for line in [
+        "Copy for Checo for opening lap.",
+        "Okay, Max. Box this lap. Set eight, set eight.",
+        "Bearman, three reds. [unclear] Leclerc.",
+        "Stay out, stay out. We are going plan B.",
+        "You can use boost on the straight, lift and coast into turn one.",
+        "Offset one click forward. We have too much rear locking now.",
+    ] {
+        let job = Job { text: line, context: &[], glossary: GLOSSARY, speaker: "Max Verstappen" };
+        let t = std::time::Instant::now();
+        match translate::translate(&client, "local", &cfg, &job).await {
+            Ok(zh) => println!("[{:.2}s] {line}\n        → {zh}", t.elapsed().as_secs_f64()),
+            Err(e) => println!("[err] {line}\n        → {e}"),
+        }
+    }
+    crate::local::get().stop().await;
+}

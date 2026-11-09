@@ -195,3 +195,28 @@ kbd { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-xs); p
 .page:hover::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, .14); }
 .page::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, .26); }
 .page::-webkit-scrollbar-thumb:active { background-color: rgba(255, 255, 255, .36); }
+
+/* ── built-in local models ── */
+.lm-engine { font-size: var(--fs-sm); color: var(--ink-3); }
+.lm-list { display: flex; flex-direction: column; gap: var(--s2); }
+.lm { border-radius: var(--r-lg); padding: 14px var(--s4); background: rgba(0, 0, 0, .22); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .3s var(--ease); }
+.lm.using { box-shadow: inset 0 0 0 1px rgba(95, 211, 154, .45); }
+.lm-top { display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.lm-name { font-size: var(--fs-base); font-weight: 600; }
+.tag { font-size: var(--fs-xs); line-height: 1; padding: 4px 8px; border-radius: 999px; background: var(--fill-2); color: var(--ink-2); }
+.tag.rec { background: rgba(255, 77, 61, .14); color: #ffb4ab; }
+.tag.run { background: rgba(95, 211, 154, .14); color: var(--ok); }
+.lm-desc { margin-top: 6px; font-size: var(--fs-sm); line-height: 1.6; color: var(--ink-3); }
+.lm-foot { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); margin-top: var(--s3); flex-wrap: wrap; }
+.lm-meta { font-size: var(--fs-sm); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.lm-act { display: flex; align-items: center; gap: var(--s2); }
+.btn.ghost { background: none; box-shadow: inset 0 0 0 1px var(--line); color: var(--ink-2); }
+.btn.ghost:hover { background: var(--fill); color: var(--ink); }
+.btn.danger, .btn.ghost.danger { color: #ffb4ab; box-shadow: inset 0 0 0 1px rgba(255, 77, 61, .4); }
+.lm-prog { display: flex; align-items: center; gap: 10px; min-width: 300px; }
+.lm-bar { flex: 1; min-width: 120px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.lm-bar i { display: block; height: 100%; border-radius: inherit; background: var(--ink); transition: width .3s var(--ease); }
+.lm-pct { font-size: var(--fs-sm); color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lm-using { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); color: var(--ok); }
+.lm-using svg { width: 14px; height: 14px; }
+.lm-err { margin-top: var(--s2); font-size: var(--fs-sm); line-height: 1.5; color: #ffb4ab; }

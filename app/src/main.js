@@ -286,7 +286,7 @@ function renderList(anim) {
       + `<button class="btn" data-test="${p.id}">测试</button><span class="res" id="res_${p.id}"></span>`;
     return `<div class="pv${r === 0 ? " primary" : ""}${open === p.id ? " open" : ""}${anim && !RM ? " stag" : ""}" style="--i:${i}" data-id="${p.id}">`
       + `<button aria-expanded="${open === p.id}"><span><span class="pn">${escapeHtml(p.n)}</span><span class="pd">${escapeHtml(p.d)}</span></span><span class="ps${status ? " on" : ""}">${status}</span>${CK}</button>`
-      + `<div class="det"><div><div class="in">${fields}<div class="acts">${actions}</div></div></div></div></div>`;
+      + `<div class="det"><div><div class="in">${p.custom ? `<div id="lmWrap">${localPanelHTML()}</div>` : fields}<div class="acts">${actions}</div></div></div></div></div>`;
   }).join("");
 }
 
@@ -333,7 +333,7 @@ $("#plist").addEventListener("click", async (e) => {
     box?.classList.remove("testing"); void box?.offsetWidth; box?.classList.add("testing");
     t.disabled = true;
     try {
-      const r = await invoke("test_provider", { id, fields: fieldsFor(settings, id) });
+      const r = await invoke("test_provider", { id, fields: PROVIDER[id]?.custom ? (settings.providers[id] ?? {}) : fieldsFor(settings, id) });
       res.innerHTML = `${ICON.check}可用 · ${(r.ms / 1000).toFixed(2)} 秒 · ${escapeHtml(r.text)}`;
     } catch (err) {
       res.className = "res err";
@@ -354,6 +354,110 @@ $("#plist").addEventListener("click", async (e) => {
 });
 
 seg("#catSeg", (b) => { cat = b.dataset.c; open = null; renderList(true); });
+
+// ── built-in local models (downloaded on demand, run on the GPU) ──
+let localInfo = null;
+const localProg = {};   // model id -> latest progress event
+const localErr = {};    // model id -> last download error
+let confirmDelete = null;
+const gb = (b) => `${(b / 1024 ** 3).toFixed(1)} GB`;
+const mb = (b) => `${Math.round(b / 1024 ** 2)} MB`;
+const SMALL_CK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+
+function progressText(p) {
+  if (!p) return "准备下载…";
+  if (p.task === "unpack") return p.label;
+  const pct = p.total ? Math.floor((p.done / p.total) * 100) : 0;
+  const speed = p.speed > 0 ? ` · ${(p.speed / 1024 ** 2).toFixed(1)} MB/s` : "";
+  return `${p.label} ${pct}%${speed}`;
+}
+
+function localPanelHTML() {
+  if (!localInfo) return '<div class="lm-engine">正在读取本地模型…</div>';
+  const using = settings?.providers?.local?.model || "";
+  const kind = localInfo.engine_kind === "cuda" ? "CUDA 版（NVIDIA 显卡）" : "Vulkan 版（通用显卡）";
+  const engine = localInfo.engine_installed
+    ? `推理引擎 · ${kind} · 已安装`
+    : `推理引擎 · ${kind} · 首次下载模型时会一并下载（约 ${mb(localInfo.engine_size)}）`;
+  const cards = localInfo.models.map((m) => {
+    const busy = localInfo.downloading === m.id;
+    const p = localProg[m.id];
+    let act;
+    if (busy) {
+      const pct = p?.total ? (p.done / p.total) * 100 : 0;
+      act = `<div class="lm-prog"><div class="lm-bar"><i style="width:${pct}%"></i></div><span class="lm-pct">${escapeHtml(progressText(p))}</span><button class="btn ghost" data-lcancel>取消</button></div>`;
+    } else if (!m.installed) {
+      act = `<button class="btn" data-ldl="${m.id}"${localInfo.downloading ? " disabled" : ""}>下载</button>`;
+    } else {
+      act = (using === m.id ? `<span class="lm-using">${SMALL_CK}正在使用</span>` : `<button class="btn pri" data-luse="${m.id}">使用此模型</button>`)
+        + `<button class="btn ghost${confirmDelete === m.id ? " danger" : ""}" data-ldel="${m.id}">${confirmDelete === m.id ? "确认删除" : "删除"}</button>`;
+    }
+    const tags = `<span class="tag">${escapeHtml(m.family)}</span>${m.recommended ? '<span class="tag rec">推荐</span>' : ""}${localInfo.running === m.id ? '<span class="tag run">运行中</span>' : ""}`;
+    return `<div class="lm${using === m.id ? " using" : ""}" data-m="${m.id}">`
+      + `<div class="lm-top"><span class="lm-name">${escapeHtml(m.name)}</span>${tags}</div>`
+      + `<div class="lm-desc">${escapeHtml(m.desc)}</div>`
+      + `<div class="lm-foot"><span class="lm-meta">${gb(m.size)} · 约 ${m.vram_gb} GB 显存</span><div class="lm-act">${act}</div></div>`
+      + (localErr[m.id] ? `<div class="lm-err">${escapeHtml(localErr[m.id])}</div>` : "")
+      + `</div>`;
+  }).join("");
+  return `<div class="lm-engine">${engine}</div><div class="lm-list">${cards}</div>`;
+}
+
+function renderLocalPanel() {
+  const w = $("#lmWrap");
+  if (w) w.innerHTML = localPanelHTML();
+}
+
+async function loadLocal() {
+  try { localInfo = await invoke("local_info"); } catch { localInfo = null; }
+  renderLocalPanel();
+}
+
+listen("local-progress", ({ payload }) => {
+  localProg[payload.model] = payload;
+  const card = document.querySelector(`.lm[data-m="${payload.model}"]`);
+  const bar = card?.querySelector(".lm-bar i"), txt = card?.querySelector(".lm-pct");
+  if (bar && txt) {
+    bar.style.width = `${payload.total ? (payload.done / payload.total) * 100 : 0}%`;
+    txt.textContent = progressText(payload);
+  } else {
+    renderLocalPanel();
+  }
+});
+listen("local-changed", loadLocal);
+
+$("#plist").addEventListener("click", async (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  if (t.dataset.ldl) {
+    const id = t.dataset.ldl;
+    delete localErr[id];
+    delete localProg[id];
+    localInfo.downloading = id;
+    renderLocalPanel();
+    try { await invoke("local_download", { id }); }
+    catch (err) { if (String(err) !== "已取消") localErr[id] = `下载没有完成：${err}。再点一次「下载」会从断点继续。`; }
+    loadLocal();
+  } else if (t.hasAttribute("data-lcancel")) {
+    invoke("local_cancel");
+  } else if (t.dataset.luse) {
+    settings.providers.local = { ...settings.providers.local, model: t.dataset.luse };
+    saveSoon();
+    renderLocalPanel();
+    renderList(false);
+  } else if (t.dataset.ldel) {
+    const id = t.dataset.ldel;
+    // Deleting a multi-gigabyte download asks for a second click.
+    if (confirmDelete !== id) { confirmDelete = id; renderLocalPanel(); setTimeout(() => { if (confirmDelete === id) { confirmDelete = null; renderLocalPanel(); } }, 4000); return; }
+    confirmDelete = null;
+    try {
+      await invoke("local_delete", { id });
+      if (settings.providers.local?.model === id) { settings.providers.local.model = ""; saveSoon(); renderList(false); }
+    } catch (err) { localErr[id] = String(err); }
+    loadLocal();
+  }
+});
+loadLocal();
 $("#tFallback").onclick = () => { settings.auto_fallback = !settings.auto_fallback; toggle($("#tFallback"), settings.auto_fallback); saveSoon(); };
 $("#tContext").onclick = () => { settings.context_lines = settings.context_lines > 0 ? 0 : 2; toggle($("#tContext"), settings.context_lines > 0); saveSoon(); };
 

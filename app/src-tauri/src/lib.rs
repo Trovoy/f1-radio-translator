@@ -1,4 +1,5 @@
 mod engine;
+mod local;
 mod settings;
 #[cfg(test)]
 mod tests;
@@ -91,6 +92,72 @@ async fn test_provider(id: String, fields: translate::Fields) -> Result<TestResu
     let t0 = Instant::now();
     let text = translate::translate(&client, &id, &fields, &job).await?;
     Ok(TestResult { text, ms: t0.elapsed().as_millis() as u64 })
+}
+
+// ── built-in local models ──
+
+#[derive(Serialize)]
+struct LocalModelView {
+    id: &'static str,
+    name: &'static str,
+    family: &'static str,
+    desc: &'static str,
+    size: u64,
+    vram_gb: f32,
+    recommended: bool,
+    installed: bool,
+}
+
+#[derive(Serialize)]
+struct LocalInfo {
+    engine_kind: &'static str,
+    engine_installed: bool,
+    engine_size: u64,
+    models: Vec<LocalModelView>,
+    downloading: Option<String>,
+    running: Option<String>,
+}
+
+#[tauri::command]
+async fn local_info() -> LocalInfo {
+    let l = local::get();
+    LocalInfo {
+        engine_kind: local::engine_kind(),
+        engine_installed: l.engine_installed(),
+        engine_size: local::engine_download_size(),
+        models: local::MODELS
+            .iter()
+            .map(|m| LocalModelView {
+                id: m.id,
+                name: m.name,
+                family: m.family,
+                desc: m.desc,
+                size: m.size,
+                vram_gb: m.vram_gb,
+                recommended: m.recommended,
+                installed: l.model_installed(m),
+            })
+            .collect(),
+        downloading: l.downloading(),
+        running: l.running().await,
+    }
+}
+
+#[tauri::command]
+async fn local_download(app: AppHandle, id: String) -> Result<(), String> {
+    local::get().download(Some(&app), &id).await
+}
+
+#[tauri::command]
+fn local_cancel() {
+    local::get().cancel();
+}
+
+#[tauri::command]
+async fn local_delete(app: AppHandle, id: String) -> Result<(), String> {
+    local::get().delete(&id).await?;
+    let _ = app.emit("local-changed", ());
+    Ok(())
 }
 
 /// Returns `[w u32][h u32][RGBA…]` so the page can paint it on a canvas.
@@ -321,6 +388,7 @@ async fn cancel_region(app: AppHandle) -> Result<(), String> {
 fn quit(app: AppHandle, shared: S) {
     remember_overlay(&app);
     let _ = shared.save();
+    local::get().stop_blocking();
     app.exit(0);
 }
 
@@ -483,6 +551,7 @@ pub fn run() {
             };
             let shared = Arc::new(Shared::new(Settings::load(&path), path));
             app.manage(shared.clone());
+            local::init(app.path().app_local_data_dir()?.join("local"));
             let handle = app.handle().clone();
             // Development aid: `F1RADIO_DRYRUN=1` prints where windows would open and exits before any shows.
             if cfg!(debug_assertions) && std::env::var("F1RADIO_DRYRUN").is_ok() {
@@ -531,6 +600,7 @@ pub fn run() {
                 if let Some(shared) = app.try_state::<Arc<Shared>>() {
                     let _ = shared.save();
                 }
+                local::get().stop_blocking();
                 app.exit(0);
             }
             _ => {}
@@ -546,6 +616,10 @@ pub fn run() {
             set_overlay_locked,
             set_overlay_visible,
             overlay_demo,
+            local_info,
+            local_download,
+            local_cancel,
+            local_delete,
             open_main,
             select_region,
             selector_ready,

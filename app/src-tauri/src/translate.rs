@@ -33,6 +33,8 @@ Overtake Mode = 超车模式，与 Boost 区分
 recharge / harvest = 回收能量
 stint = 赛段（视上下文可译为轮胎使用阶段）
 set eight / set of tyres = 第八套轮胎
+click / offset one click = 调一格（调校档位）；brake bias = 刹车平衡；diff = 差速器
+rear locking / front locking = 后轮抱死 / 前轮抱死
 softs / mediums / hards / inters / wets = 软胎 / 中性胎 / 硬胎 / 半雨胎 / 全雨胎
 deg = 轮胎衰退
 undercut / overcut = 提前进站反超 / 晚进站反超
@@ -95,6 +97,20 @@ fn need<'a>(cfg: &'a Fields, k: &str, label: &str) -> Result<&'a str, String> {
 
 fn chat_system(job: &Job) -> String {
     let mut s = format!("{SYSTEM}\n\nTerminology (English = Chinese):\n{}", job.glossary);
+    // Naming the names in this very line works far better than the general rule alone.
+    let (_, names) = protect_names(job.text);
+    if !names.is_empty() {
+        let mut uniq: Vec<String> = Vec::new();
+        for n in names {
+            if !uniq.contains(&n) {
+                uniq.push(n);
+            }
+        }
+        s.push_str(&format!(
+            "\n\nNames in this line, to be copied exactly in Latin letters and never translated or transliterated: {}.",
+            uniq.join(", ")
+        ));
+    }
     if !job.speaker.trim().is_empty() {
         s.push_str(&format!(
             "\n\nThis line is from {}'s radio channel: it is either that driver speaking or their race engineer speaking to them. Use this to resolve \"you\", names and missing subjects.",
@@ -180,6 +196,10 @@ fn post_edit(en: &str, zh: String) -> String {
     }
     if has("pit") || has("pitting") || has("pits") {
         out = out.replace("点蚀", "进站").replace("凹坑", "进站");
+    }
+    // A reference translation like "第八套轮胎" sometimes gets an extra 第 in front.
+    while out.contains("第第") {
+        out = out.replace("第第", "第");
     }
     if lower.contains("double yellow") {
         out = out.replace("双黄色", "双黄旗");
@@ -270,6 +290,7 @@ async fn route(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Result<Stri
         "libre" => libre(c, cfg, job).await,
         "deeplx" => deeplx(c, cfg, job).await,
         "claude" => anthropic(c, cfg, job).await,
+        "local" => local_model(c, cfg, job).await,
         _ => openai_compat(c, id, cfg, job).await,
     }
 }
@@ -330,6 +351,118 @@ async fn openai_compat(c: &Client, id: &str, cfg: &Fields, job: &Job<'_>) -> Res
     }
     let v = send(req).await?;
     Ok(strip_thinking(&pick(&v, "/choices/0/message/content")?))
+}
+
+/// F1 terms as structured pairs, for models that take reference translations (HY-MT).
+const TERMS: &[(&str, &str)] = &[
+    ("copy that", "收到"),
+    ("copy", "收到"),
+    ("box box", "进站进站"),
+    ("box", "进站"),
+    ("stay out", "留在赛道上"),
+    ("lift and coast", "松油滑行"),
+    ("push", "全力推进"),
+    ("track limits", "赛道界限"),
+    ("boost", "Boost（能量部署）"),
+    ("overtake mode", "超车模式"),
+    ("recharge", "回收能量"),
+    ("harvest", "回收能量"),
+    ("stint", "赛段"),
+    ("deg", "轮胎衰退"),
+    ("undercut", "提前进站反超"),
+    ("overcut", "晚进站反超"),
+    ("delta", "时间差"),
+    ("opening lap", "首圈"),
+    ("safety car", "安全车"),
+    ("VSC", "虚拟安全车"),
+    ("blue flags", "蓝旗"),
+    ("double yellows", "双黄旗"),
+    ("pit entry", "维修区入口"),
+    ("pit exit", "维修区出口"),
+    ("set eight", "第八套轮胎"),
+    ("new set", "一套新胎"),
+    ("one click", "一格"),
+    ("click", "一格"),
+    ("offset", "偏移"),
+    ("brake bias", "刹车平衡"),
+    ("diff", "差速器"),
+    ("rear locking", "后轮抱死"),
+    ("front locking", "前轮抱死"),
+    ("softs", "软胎"),
+    ("mediums", "中性胎"),
+    ("hards", "硬胎"),
+    ("inters", "半雨胎"),
+    ("[unclear]", "[听不清]"),
+];
+
+/// Tencent HY-MT's own template: background, reference translations, then the text.
+pub fn hymt_prompt(job: &Job) -> String {
+    let lower = job.text.to_lowercase();
+    let mut refs: Vec<String> = Vec::new();
+    for (en, zh) in TERMS {
+        let pat = format!(r"(?i)(^|[^a-z]){}([^a-z]|$)", regex::escape(en));
+        if regex::Regex::new(&pat).is_ok_and(|re| re.is_match(&lower)) && !refs.iter().any(|r| r.starts_with(&format!("{en} "))) {
+            // "box box" already covers "box".
+            if refs.iter().any(|r| r.split(" 翻译成 ").next().is_some_and(|k| k.contains(en))) {
+                continue;
+            }
+            refs.push(format!("{en} 翻译成 {zh}"));
+        }
+    }
+    let (_, names) = protect_names(job.text);
+    for n in names {
+        let line = format!("{n} 翻译成 {n}");
+        if !refs.contains(&line) {
+            refs.push(line);
+        }
+    }
+    let mut p = String::new();
+    if !job.context.is_empty() {
+        p.push_str("请结合背景信息将以下文本翻译为中文。\n【背景信息】\nF1 赛车无线电");
+        if !job.speaker.trim().is_empty() {
+            p.push_str(&format!("，{} 的频道", job.speaker.trim()));
+        }
+        p.push_str("。前文：");
+        p.push_str(&job.context.join(" "));
+        p.push_str("\n\n");
+    }
+    if !refs.is_empty() {
+        p.push_str("参考下面的翻译：\n");
+        p.push_str(&refs.join("\n"));
+        p.push_str("\n\n");
+    }
+    p.push_str("将以下文本翻译为中文，注意只需要输出翻译后的结果，不要额外解释：\n\n");
+    p.push_str(job.text);
+    p
+}
+
+/// The built-in llama.cpp model chosen on the local model page.
+async fn local_model(c: &Client, cfg: &Fields, job: &Job<'_>) -> Result<String, String> {
+    let id = f(cfg, "model");
+    let m = crate::local::model(id).ok_or("请先在「本地模型」里下载并选择一个模型")?;
+    let port = crate::local::get().ensure_server(id).await?;
+    let url = format!("http://127.0.0.1:{port}/v1/chat/completions");
+    let body = match m.style {
+        crate::local::Style::HyMt => json!({
+            "model": m.id,
+            "messages": [{ "role": "user", "content": hymt_prompt(job) }],
+            // Tencent's recommended sampling for the 1.8B and 7B models.
+            "temperature": 0.7, "top_p": 0.6, "top_k": 20, "repeat_penalty": 1.05,
+            "max_tokens": 256, "stream": false
+        }),
+        crate::local::Style::Chat => json!({
+            "model": m.id,
+            "messages": [
+                { "role": "system", "content": format!("{}\n/no_think", chat_system(job)) },
+                { "role": "user", "content": job.text }
+            ],
+            "chat_template_kwargs": { "enable_thinking": false },
+            "temperature": 0.2, "max_tokens": 256, "stream": false
+        }),
+    };
+    let v = send(c.post(url).json(&body).timeout(Duration::from_secs(90))).await?;
+    let zh = strip_thinking(&pick(&v, "/choices/0/message/content")?);
+    Ok(if m.style == crate::local::Style::HyMt { post_edit(job.text, zh) } else { zh })
 }
 
 /// Drops a `<think>…</think>` block some local models still emit before the answer.

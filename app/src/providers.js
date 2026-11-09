@@ -27,6 +27,7 @@ export const PROVIDERS = [
   { id: "openrouter", n: "OpenRouter", c: "llm", d: "一个 Key 用多家模型", f: [KEY, MODEL("")] },
   { id: "silicon", n: "硅基流动", c: "llm", d: "开源模型托管", f: [KEY, MODEL("Qwen/Qwen2.5-7B-Instruct")] },
   { id: "custom", n: "自定义接口", c: "llm", d: "任意 OpenAI 兼容地址", f: [URL(""), KEY, MODEL("")] },
+  { id: "local", n: "本地模型（显卡）", c: "local", d: "内置推理引擎，调用显卡离线翻译，无需安装其他软件", f: [], custom: true },
   { id: "ollama", n: "Ollama", c: "local", d: "本机运行，无需密钥", f: [URL("http://localhost:11434/v1"), MODEL("qwen2.5:7b")] },
   { id: "lmstudio", n: "LM Studio", c: "local", d: "本机运行", f: [URL("http://localhost:1234/v1"), MODEL("")] },
   { id: "libre", n: "LibreTranslate", c: "local", d: "开源，可自建", f: [{ k: "url", l: "服务地址", def: "http://localhost:5000" }, { ...KEY, l: "API Key（可选）" }] },
@@ -48,6 +49,7 @@ export function fieldsFor(settings, id) {
 export function isConfigured(settings, id) {
   const p = PROVIDER[id];
   if (!p) return false;
+  if (p.custom) return !!settings.providers?.[id]?.model;
   const v = fieldsFor(settings, id);
   return p.f.every((f) => /可选/.test(f.l) || f.k === "email" || (v[f.k] ?? "").trim() !== "");
 }

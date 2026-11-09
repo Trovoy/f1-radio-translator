@@ -116,6 +116,21 @@ pub fn start(app: AppHandle, shared: Arc<Shared>) {
     shared.history.lock().unwrap().clear();
     let (tx, rx) = mpsc::channel::<Line>(64);
     status(&app, &shared, "info", "正在启动文字识别…");
+    // A built-in local model in the chain is loaded into VRAM now, not on the first line.
+    let local_model = {
+        let s = shared.settings.lock().unwrap();
+        s.chain.iter().any(|c| c == "local").then(|| s.providers.get("local").and_then(|f| f.get("model")).cloned()).flatten()
+    };
+    if let Some(id) = local_model.filter(|id| !id.is_empty()) {
+        let (a, s) = (app.clone(), shared.clone());
+        tauri::async_runtime::spawn(async move {
+            status(&a, &s, "info", "正在把本地模型载入显卡…");
+            match crate::local::get().ensure_server(&id).await {
+                Ok(_) => status(&a, &s, "info", "本地模型已就绪"),
+                Err(e) => status(&a, &s, "warn", format!("本地模型启动失败：{e}")),
+            }
+        });
+    }
 
     let (a, s) = (app.clone(), shared.clone());
     std::thread::spawn(move || scan_loop(a, s, gen, tx));
@@ -136,6 +151,8 @@ pub fn stop(app: &AppHandle, shared: &Shared) {
     shared.generation.fetch_add(1, Ordering::SeqCst);
     *shared.state.lock().unwrap() = RunState::Idle;
     status(app, shared, "info", "已结束");
+    // Free the VRAM once translation ends.
+    tauri::async_runtime::spawn(async { crate::local::get().stop().await });
 }
 
 pub fn toggle(app: AppHandle, shared: Arc<Shared>) {
