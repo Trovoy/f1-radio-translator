@@ -1,11 +1,15 @@
 import { $, invoke } from "./shared.js";
 
 const sel = $("#sel");
+// The hint bar stays put while the pointer moves (so its buttons can be clicked); it only
+// sits at the bottom when the box itself is near the top, and fades out while drawing.
+const bar = $("#bar");
 const MIN_W = 50, MIN_H = 20;
 let rect = null; // CSS pixels within this window
 let drag = null;
 
 function render() {
+  bar.classList.toggle("low", !!rect && rect.y < 120);
   if (!rect) { sel.hidden = true; document.body.classList.remove("has-sel"); $("#ok").disabled = true; return; }
   Object.assign(sel.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
   sel.hidden = false;
@@ -30,13 +34,6 @@ document.addEventListener("pointerdown", (e) => {
   else if (e.target.closest(".sel")) drag = { mode: "move", start };
   else { drag = { mode: "draw", start }; rect = { x: e.clientX, y: e.clientY, w: 0, h: 0 }; }
   document.setPointerCapture?.(e.pointerId);
-});
-
-// The hint bar never covers what you are framing: it drops to the bottom edge when the
-// pointer nears the top, and fades out while a box is being drawn or moved.
-const bar = $("#bar");
-document.addEventListener("pointermove", (e) => {
-  if (!drag) bar.classList.toggle("low", e.clientY < 140);
 });
 
 document.addEventListener("pointermove", (e) => {
