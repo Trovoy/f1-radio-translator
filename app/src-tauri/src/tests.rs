@@ -158,3 +158,43 @@ async fn deepl_samples_from_user_settings() {
         }
     }
 }
+
+#[test]
+fn name_rows_survive_ocr_slips() {
+    let row = |top: f32, text: &str| vision::OcrLine { top, left: 0.0, text: text.into() };
+    // Spaces dropped and the comma read as a period.
+    let cards = vision::extract_cards(vec![
+        row(0.0, "Keep pushing. Keep pushing. Just put this set on."),
+        row(20.0, "IsockHadjar.9Nov2026."),
+    ]);
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].speaker, "Isack Hadjar");
+    assert_eq!(cards[0].text, "Keep pushing. Keep pushing. Just put this set on.");
+
+    // The last text line and the name row merged into one OCR line.
+    let cards = vision::extract_cards(vec![
+        row(0.0, "Keep pushing."),
+        row(20.0, "Just put this set on. Isack Hadjar • 9 Nov 2026, 01:19:34"),
+    ]);
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].speaker, "Isack Hadjar");
+    assert_eq!(cards[0].text, "Keep pushing. Just put this set on.");
+
+    // A card cut off at the bottom (no name row yet) is not sent.
+    let cards = vision::extract_cards(vec![
+        row(0.0, "Car behind now, Max."),
+        row(20.0, "Isack Hadjar · 9 Nov 2026, 01:19:34"),
+        row(40.0, "Group ahead, five seconds."),
+    ]);
+    assert_eq!(cards.len(), 1);
+    assert_eq!(cards[0].text, "Car behind now, Max.");
+}
+
+#[test]
+fn speaker_names_snap_to_the_grid() {
+    assert_eq!(vision::canonical_speaker("IsockHadjar"), "Isack Hadjar");
+    assert_eq!(vision::canonical_speaker("Arvid Lindbiad"), "Arvid Lindblad");
+    assert_eq!(vision::canonical_speaker("Max Verstappen"), "Max Verstappen");
+    assert_eq!(vision::canonical_speaker("Race Engineer"), "Race Engineer", "not a driver: kept as read");
+    assert_eq!(vision::canonical_speaker("Hamllton"), "Lewis Hamilton");
+}

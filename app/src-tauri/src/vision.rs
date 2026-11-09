@@ -178,7 +178,8 @@ fn timestamp_re() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     // The time part is optional: OCR sometimes drops "14:22:08" from the row.
     RE.get_or_init(|| {
-        Regex::new(r"(?i)\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}\b(?:\s*,?\s*\d{1,2}:\d{2}(?::\d{2})?)?").unwrap()
+        // Spaces are optional too: OCR has read "Isack Hadjar · 9 Nov 2026" as "IsockHadjar.9Nov2026".
+        Regex::new(r"(?i)\d{1,2}\s*(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*,?\s*(?:19|20)\d{2}(?:\s*[,.]?\s*\d{1,2}:\d{2}(?::\d{2})?)?").unwrap()
     })
 }
 
@@ -233,6 +234,23 @@ pub fn extract_cards(mut rows: Vec<OcrLine>) -> Vec<Card> {
         });
         if let Some(at) = meta {
             let mut speaker = trim(&text[..at]);
+            // OCR sometimes joins the card's last line and the name row into one line:
+            // keep the trailing name as the speaker and give the rest back to the card text.
+            if !speaker.is_empty() && !name.is_match(&speaker) {
+                static TAIL: OnceLock<Regex> = OnceLock::new();
+                let tail = TAIL.get_or_init(|| Regex::new(r"([A-Z][A-Za-z'’.-]*(?:\s+[A-Z][A-Za-z'’.-]*){0,2})$").unwrap());
+                let head = speaker.clone();
+                match tail.find(&head) {
+                    Some(m) if m.start() > 0 => {
+                        current.push(head[..m.start()].trim().to_string());
+                        speaker = trim(m.as_str());
+                    }
+                    _ => {
+                        current.push(head);
+                        speaker = String::new();
+                    }
+                }
+            }
             if speaker.is_empty() {
                 if let Some(last) = current.last() {
                     let cand = trim(last);
@@ -244,7 +262,7 @@ pub fn extract_cards(mut rows: Vec<OcrLine>) -> Vec<Card> {
             }
             let message = current.join(" ").trim().to_string();
             if !message.is_empty() {
-                cards.push(Card { speaker, text: message });
+                cards.push(Card { speaker: if speaker.is_empty() { speaker } else { canonical_speaker(&speaker) }, text: message });
             }
             current.clear();
             continue;
@@ -259,12 +277,51 @@ pub fn extract_cards(mut rows: Vec<OcrLine>) -> Vec<Card> {
         }
         current.push(text);
     }
-    // A trailing card without its metadata row is only kept when it reads complete.
-    let message = current.join(" ").trim().to_string();
-    if message.len() >= 4 && message.ends_with(['.', '!', '?', '…']) {
-        cards.push(Card { speaker: String::new(), text: message });
-    }
+    // Text after the last name row belongs to a card cut off by the region's edge. It is left
+    // out until its name row is visible, so a half-read name or date never reaches translation.
     cards
+}
+
+/// 2026 grid, used to repair OCR slips in speaker names.
+const DRIVERS: &[&str] = &[
+    "Max Verstappen", "Isack Hadjar", "Charles Leclerc", "Lewis Hamilton", "George Russell", "Kimi Antonelli",
+    "Lando Norris", "Oscar Piastri", "Fernando Alonso", "Lance Stroll", "Pierre Gasly", "Franco Colapinto",
+    "Esteban Ocon", "Oliver Bearman", "Nico Hulkenberg", "Gabriel Bortoleto", "Liam Lawson", "Arvid Lindblad",
+    "Alexander Albon", "Carlos Sainz", "Sergio Perez", "Valtteri Bottas",
+];
+
+fn edit_distance(a: &str, b: &str) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut cur = vec![i + 1; b.len() + 1];
+        for (j, cb) in b.iter().enumerate() {
+            cur[j + 1] = (prev[j] + (ca != cb) as usize).min(prev[j + 1] + 1).min(cur[j] + 1);
+        }
+        prev = cur;
+    }
+    prev[b.len()]
+}
+
+/// "IsockHadjar" → "Isack Hadjar": the closest grid name within a few letters, else the text as read.
+pub fn canonical_speaker(raw: &str) -> String {
+    let compact: String = raw.chars().filter(|c| c.is_alphabetic()).flat_map(char::to_lowercase).collect();
+    if compact.len() < 5 {
+        return raw.trim().to_string();
+    }
+    let best = DRIVERS
+        .iter()
+        .map(|d| {
+            let dc: String = d.chars().filter(|c| c.is_alphabetic()).flat_map(char::to_lowercase).collect();
+            // A surname alone (e.g. "Hadjar") also counts.
+            let surname: String = d.rsplit(' ').next().unwrap_or(d).to_lowercase();
+            (edit_distance(&compact, &dc).min(edit_distance(&compact, &surname)), *d)
+        })
+        .min_by_key(|(dist, _)| *dist);
+    match best {
+        Some((dist, d)) if dist <= (compact.len() / 5).max(1).min(3) => d.to_string(),
+        _ => raw.trim().to_string(),
+    }
 }
 
 pub fn is_transcript(text: &str) -> bool {
